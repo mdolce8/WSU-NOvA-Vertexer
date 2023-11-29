@@ -18,10 +18,19 @@ Updated: Nov. 2023
 
 
 ## 0. Pre-processing
-As it stands, the code is set up to run on the WSU cluster. The objective is to slim the file sizeby reducing the other unnecessary NOvA variables. The only variables we need are:
+As it stands, the code is set up to run on the WSU cluster.
+The objective is to slim the file sizeby reducing the other unnecessary NOvA variables. 
+The variables we require are:
 
 - `cvnmap` 
-- `vtx.{x,y,z}`.
+- `vtx.{x,y,z}`
+- `firstcell{x,y}
+- `firstplane`
+
+The `cvnmap` and `vtx.{x,y,z}` values are explicitly required for training.
+The pixelmaps (`cvnmap`) are our features and the true vertex location is our label.
+
+There are other variables we need that record the information of which cell (for x and y coordinates) and plane (for z) is the start of the pixel map. This will allow us to translate back and forth from detector space to pixel map space.  
 
 To start, we run a bash script to create the slurm configuration for a WSU Beoshock cluster job(s). In an SSH session on the BeoShock cluster, we use this incantation:
 ```
