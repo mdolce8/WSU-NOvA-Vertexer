@@ -81,7 +81,7 @@ Especially for plot **1.**, it is important the vertex location is sensible, oth
 
 Here is an example:
 
-![example of a FD interaction of the pixel map wih the true vertex location overlaid.](https://github.com/mdolce8/[WSU-NOvA-Vertexer]/blob/main/initial-checks/cvnmap_example.png?raw=true "CVN Map example")
+![example of a FD interaction of the pixel map wih the true vertex location overlaid.](https://github.com/mdolce8/WSU-NOvA-Vertexer/blob/main/Prod5.1-FD/initial-checks/cvnmap_example.png?raw=true "CVN Map example")
 
 
 ---
