@@ -11,9 +11,10 @@ Updated: Nov. 2023
 
 ## Workflow
 0. [Pre-processing](#pre-processing)
-1. [Training](#training)
-2. [Prediction](#prediction)
-3. [Analysis](#analysis)
+1. [Inital-checks](#initial-checks)
+2. [Training](#training)
+3. [Prediction](#prediction)
+4. [Analysis](#analysis)
 
 
 ## 0. Pre-processing
@@ -47,6 +48,43 @@ For those that are curious, the `submit_slurm_<some-descriptions>.sh` script is 
 
 With the completed files, training can be performed. 
 
+But first, we want to run some initial checks on the files to make sure they are good to go.
+The next section...
 
 
 ---
+
+## 1. Initial-checks
+
+At this stage, we want to make sure the information within the pre-processed files are correct and ready to be used.
+
+Because the labels fed into our network are locations -- in detector coordinates -- and the pixel maps (used for the training),
+-- the features -- are used to train the network, we need to convert the vertex location into the pixel map space. 
+This step confirms everything looks OK.
+
+To run the initial checks, we use two notebooks:
+* `validate_preprocessed_h5.ipynb`
+* `plot_cvnmaps.ipynb`
+
+The first notebook is very simple, it just checks the size of the `cvnmap` (the pixel maps) and plots the first 20 vertex locations for the X coordinate.
+
+The second notebook is more thorough. It does the following:
+1. reads in the pre-processed h5 file as `numpy.ndarray`
+2. checks the type and shape of the data (cvnmaps, vtx locations, and cells/plane)
+3. creates a new array to convert each vertex coordinate into a pixel map coordinate (it also loads the array in a specific way because the original h5s were saved as `unsigned int` and we need to convert them to `int`).
+4. lastly, it makes plots of:
+   1. random pixel maps with the true vertex overlaid in yellow 'x'
+   2. all the true detector vertex locations.
+   3. all the true vertex locations in the 3D pixel map space
+
+Especially for plot **1.**, it is important the vertex location is sensible, otherwise the training will produce nonsense.
+
+Here is an example:
+
+![example of a FD interaction of the pixel map wih the true vertex location overlaid.](https://github.com/mdolce8/[WSU-NOvA-Vertexer]/blob/main/initial-checks/cvnmap_example.png?raw=true "CVN Map example")
+
+
+---
+
+
+
