@@ -53,7 +53,7 @@ cat > ${slurm_dir}/${slurm_script} <<EOF
 #SBATCH --job-name=preprocess_${PREPROCESS_FILE}
 
 # 24 hours seems to be the edge, so add more...
-#SBATCH --time=36:00:00
+#SBATCH --time=48:00:00
 
 #SBATCH --output ${OUTDIR_PREFIX}/logs/${PREPROCESS_FILE}.out
 #SBATCH --error  ${OUTDIR_PREFIX}/logs/${PREPROCESS_FILE}.err

@@ -1,14 +1,19 @@
-# $PY37 preprocess_h5_file.py <infile_h5>
-
 # python script to preprocess the h5 files for training
-# which cuts out everything but the vertex and cvnmap info
-# (vtx.x, vtx.y, vtx.z, cvnmap).
+# which cuts out everything but:
+#   -- the vertex
+#   -- first cell and plane,
+#   -- cvnmap.
+# (vtx.x, vtx.y, vtx.z, firstcellx, firstcelly, firstplane, cvnmap).
 
 # this script is submitted to the BeoShock (WSU) cluster
 # where each slurm submission processes one file at a time
 
 # M. Dolce
 # Oct. 2023
+
+# To run this script:  $PY37 preprocess_h5_file.py <infile_h5>
+
+
 
 import os
 import sys
@@ -41,7 +46,10 @@ if __name__ == '__main__':
     df_y = h5py.File(inFilePath, 'r')['vtx.y']
     df_z = h5py.File(inFilePath, 'r')['vtx.z']
     df_cvnmap = h5py.File(inFilePath, 'r')['cvnmap']
-    print('loaded the vertices and cvnmap dfs')
+    df_firstcellx = h5py.File(inFilePath, 'r')['firstcellx']
+    df_firstcelly = h5py.File(inFilePath, 'r')['firstcelly']
+    df_firstplane = h5py.File(inFilePath, 'r')['firstplane']
+    print('loaded the vertices, first cells, first plane and cvnmap dfs')
 
     # Save in an h5 with new dataset keys
     hf = h5py.File(os.path.join(outPath, outName), 'w')
@@ -52,6 +60,12 @@ if __name__ == '__main__':
     print('added vtx.y')
     hf.create_dataset('vtx.z',  data=df_z,                compression='gzip')
     print('added vtx.z')
+    hf.create_dataset('firstcellx', data=df_firstcellx,   compression='gzip')
+    print('added firstcellx')
+    hf.create_dataset('firstcelly', data=df_firstcelly,   compression='gzip')
+    print('added firstcelly')
+    hf.create_dataset('firstplane', data=df_firstplane,   compression='gzip')
+    print('added firstplane')
 
     # save as 'chunks' to save space, since each pixel map is this size.
     hf.create_dataset('cvnmap', data=np.stack(df_cvnmap), chunks=(1, 16000),  compression='gzip')
