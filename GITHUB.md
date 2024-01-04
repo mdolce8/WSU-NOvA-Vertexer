@@ -1,4 +1,4 @@
-# Hacking
+# Working with GitHub
 
 ### How to work with `git` (and GitHub) 
 
