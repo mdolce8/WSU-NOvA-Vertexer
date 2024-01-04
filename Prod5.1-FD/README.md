@@ -177,3 +177,12 @@ Have fun!
 --- 
 
 # 4. Analysis
+
+Now we want to analyze the results of the model predictions.
+
+i. `plot_cvnmap_predictions.ipynb`
+This macro will plot the pixel map with the true vertex location _and_ the model prediction. This is intended as a qualitative check.
+
+ii. `fd_fluxswap_p5p1_validation.ipynb` This macro plots more quantitative metrics, like the resolution of the prediction vs. the 
+Elastic Arms algorithm, and also breaks it down into interaction type.
+
