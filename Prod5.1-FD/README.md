@@ -142,4 +142,38 @@ plumbing is working properly. This can also be helpful for debugging.
 This script is `x_vertex_training_testsize.py`.** 
 
 
+--- 
 
+# 3. Prediction
+
+Next, we want to use the model file to make predictions on the designated inference data set.
+
+NOTE: 
+* the inference data set is different from the training data set.
+* In the FD Prod5.1 {FHC,RHC} {nonswap,fluxswap} samples, the inference data set is file 24 and/or 27.
+
+We run the prediction with, for example, the x coordinate, 
+
+``` python model-prediction/x_model_prediction_generation.py <det> <horn> <flux>```
+
+where `det` is "FD" for Far Detector, `horn` is the magnetic horn current `FHC` or `RHC`
+(for "Forward Horn Current" and "Reverse Horn Current"), `flux` is either `nonswap` or `fluxswap` (for muon neutrinos or electron neutrinos, respectively).
+
+This will generate a prediction of the x vertex using the trained model.
+
+---
+IMPORTANT NOTE: there is a bug in the model that produces 256 predictions for a single vertex,
+which is not exactly what we want. Instead, we want just one prediction for each vertex, so at the moment, this
+code takes the mean of the 256 predictions. This will be addressed in a future PR.
+---
+
+These predictions will be saved as a CSV file that contain the following information:
+```['True X', 'Reco X', 'Model Prediction']``` ordered and labeled in this fashion.
+
+At this stage, the use can now make numerous comparisons between the model and the standard NOvA "Elastic Arms" algorithm!
+
+Have fun!
+
+--- 
+
+# 4. Analysis
