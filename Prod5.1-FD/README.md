@@ -129,6 +129,29 @@ Once this is addressed, we can submit the slurm script that is created from the 
 
 ```sbatch submit_slurm_training_${COORDINATE}_${DET}_${HORN}_${FLUX}_${DATE}.sh```
 
+For those curious, what is _really_ running is `x_vertex_training.py` (for the x coordinate, for example),
+where the arguments from the bash script are used into the training script.
+This script does many important things:
+* loads the pre-processed h5 files,
+* correctly formats the data,
+* creates the model,
+* trains the model,
+* and saves the model to an h5 file,
+* saves the metrics (the history) to a CSV file.
+
+---
+**Details about training**: there are separate training scripts for each coordinate, so the user must run each one individually.
+The reason is due to subtle differences with the information that is needed/used for training each coordinate.
+Namely, when training the `x` and `y` coordinates, only one of two planes will be of use, the **XZ** or **YZ** plane, respectively.
+Thus, we do not need to give the model excess information of the other plane
+**However**, the `z` plane is different. We can benefit from both planes, so we need to give the model both planes. 
+This is the primary reason we have separate training scripts for each coordinate.
+
+Despite these differences in _how_ the model is constructed for training, these changes are transparent to the user;
+they all should be submitted to the WSU cluster in the same way via the slurm script created from `create_slurm_script_training.sh`.
+
+---
+
 To check on the status of the job, we can do: ```squeue -u $USER``` or `kstat` to see the status of the job.
 Note, that there are `.log` and `.err` files that get made (with the same name as the sbatch script) that can be used to debug the job too (very helpful).
 The job _should_ take about 24 (likely more) hours to complete. 
@@ -179,6 +202,9 @@ Have fun!
 # 4. Analysis
 
 Now we want to analyze the results of the model predictions.
+
+Again, we emphasize that for this particular NOvA production, Prod5.1 for FD, we designate file "24" and file "27" for the inference data set.
+
 
 i. `plot_cvnmap_predictions.ipynb`
 This macro will plot the pixel map with the true vertex location _and_ the model prediction. This is intended as a qualitative check.
