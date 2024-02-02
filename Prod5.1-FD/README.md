@@ -175,19 +175,22 @@ NOTE:
 * the inference data set is different from the training data set.
 * In the FD Prod5.1 {FHC,RHC} {nonswap,fluxswap} samples, the inference data set is file 24 and/or 27.
 
-We run the prediction with, for example, the x coordinate, 
+We run the prediction with, 
 
-``` python model-prediction/x_model_prediction_generation.py <det> <horn> <flux>```
+``` python model-prediction/model_predict_coordinate.py --detector FD --horn FHC --flux Fluxswap--model_file <model_file>```
 
-where `det` is "FD" for Far Detector, `horn` is the magnetic horn current `FHC` or `RHC`
-(for "Forward Horn Current" and "Reverse Horn Current"), `flux` is either `nonswap` or `fluxswap` (for muon neutrinos or electron neutrinos, respectively).
+where `detector` is "FD" for Far Detector, `horn` is the magnetic horn current `FHC` or `RHC`
+(for "Forward Horn Current" and "Reverse Horn Current"), `flux` is either `nonswap` or `fluxswap` (for muon neutrinos or electron neutrinos, respectively),
+and `--model_file` is the full path to the h5 file produced from the training.
 
-This will generate a prediction of the x vertex using the trained model.
+This will generate a prediction of the coordinate that's name is included in the `model_file` name.
 
 ---
-IMPORTANT NOTE: there is a bug in the model that produces 256 predictions for a single vertex,
+IMPORTANT NOTE: the model for the X and Y coordinates produces 256 predictions for a single vertex,
 which is not exactly what we want. Instead, we want just one prediction for each vertex, so at the moment, this
-code takes the mean of the 256 predictions. This will be addressed in a future PR.
+code takes the mean of the 256 predictions.
+(We have been looking into how we can reduce the number of predictions to just one, without reducing performance.)
+This will be addressed in a future PR.
 ---
 
 These predictions will be saved as a CSV file that contain the following information:
@@ -209,6 +212,5 @@ Again, we emphasize that for this particular NOvA production, Prod5.1 for FD, we
 i. `plot_cvnmap_predictions.ipynb`
 This macro will plot the pixel map with the true vertex location _and_ the model prediction. This is intended as a qualitative check.
 
-ii. `fd_fluxswap_p5p1_validation.ipynb` This macro plots more quantitative metrics, like the resolution of the prediction vs. the 
-Elastic Arms algorithm, and also breaks it down into interaction type.
+ii. `fd_p5p1_nu_specrta.ipynb` This macro plots simple Enu distribution, and also broken down into interaction type.
 
