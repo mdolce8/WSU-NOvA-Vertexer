@@ -6,46 +6,59 @@
 # 
 # Makes plots to compare the true and E.A. reconstructed vertex (from a specified coordinate).
 # NOTE: this makes resolution plots of ONE COORDINATE.
+# NOTE: the abs(resolution) uses the mean from the histogram, not the dataframe.
+# NOTE: (reco-true)/true does not report RMS.
 # 
 # This validation is using `file_27_of_28.h5` as Ashley indicated.
 # 
-#  $ PY37 plot_vertex_resolutions.py --pred_file <path/to/CSV/predictions/file>
-#
-# TODO:
-#  --add quantitative metrics to the histograms
-#  --make the histograms easier to distinguish (make model points?)
+#  $ PY37 plot_vertex_resolutions.py --pred_file <path/to/CSV/predictions/file> --verbose false
+# 
 
-
-# In[9]:
+# TODO: draw a line where the mean is....?
+# TODO: should look into making a box plot somehow....
 
 
 import argparse
-import os.path
+import os
 import h5py
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from subprocess import call
+
 # import seaborn as sns
-
-
-
-# In[42]:
 
 
 # collect the arguments for this macro. the horn and swap options are required.
 parser = argparse.ArgumentParser()
 parser.add_argument("--pred_file", help="the CSV file of vertex predictions", default="", type=str)
+parser.add_argument("--verbose", help="add printouts, helpful for debugging", default=False, type=bool)
 args = parser.parse_args()
 
 args.pred_file = args.pred_file
+args.verbose = args.verbose
 print('pred_file: {}'.format(args.pred_file))
 
+# filename without the CSV and path.
 pred_filename_prefix = args.pred_file.split('/')[-1].split('.')[0]  # get the filename only and remove the .csv
 COORDINATE = ''
 HORN = ''
+FLUX = ''
 
 # Load the CSV file of the model predictions.
+# Get the detector...
+print('Determining the detector...')
+if 'FD' in pred_filename_prefix:
+    print('I found `FD`.')
+    DETECTOR = 'FD'
+elif 'ND' in pred_filename_prefix:
+    print('I found `ND`.')
+    DETECTOR = 'ND'
+else:
+    print('ERROR. I did not find a detector to make predictions for, exiting......')
+    exit()
+print('DETECTOR: {}'.format(DETECTOR))
+
+# Get coordinate...
 print('Determining the coordinate...')
 if '_X_' in pred_filename_prefix:
     print('I found `_X_`.')
@@ -61,6 +74,7 @@ else:
     exit()
 print('COORDINATE: {}'.format(COORDINATE))
 
+# Get horn...
 print('Determining the horn...')
 if 'FHC' in pred_filename_prefix:
     print('I found `FHC`.')
@@ -72,6 +86,19 @@ else:
     print('ERROR. I did not find a horn to make predictions for, exiting......')
     exit()
 print('HORN: {}'.format(HORN))
+
+# Get flux...
+print('Determining the flux...')
+if 'Fluxswap' in pred_filename_prefix:
+    print('I found `Fluxswap`.')
+    FLUX = 'Fluxswap'
+elif 'Nonswap' in pred_filename_prefix:
+    print('I found `Nonswap`.')
+    FLUX = 'Nonswap'
+else:
+    print('ERROR. I did not find a flux to make predictions for, exiting......')
+    exit()
+print('FLUX: {}'.format(FLUX))
 
 csvfile = pd.read_csv(args.pred_file,
                       sep=',',
@@ -94,16 +121,14 @@ df_pred = csvfile['Model Pred {}'.format(COORDINATE)]
 print(len(df_pred), 'predictions in file')
 print(df_pred.head())
 
-# In[44]:
-
 
 # define the path to the validation files
 validation_path = '/Users/michaeldolce/Development/files/h5-files/validation/'
-call(' ls -rtlh  $validation_path')
+print(os.listdir(validation_path))
 
-# TODO: will need to change the validation file in future to include Nonswap and FHC/RHC...
+
 # Open the designated validation file
-validation_file = 'trimmed_h5_R20-11-25-prod5.1reco.j_FD-Nominal-FHC-Fluxswap_27_of_28.h5'
+validation_file = 'trimmed_h5_R20-11-25-prod5.1reco.j_{}-Nominal-{}-{}_27_of_28.h5'.format(DETECTOR, HORN, FLUX)
 
 file_h5 = h5py.File(validation_path + validation_file, 'r', )  # open the file:
 file_h5.keys()  # see what is in the file
@@ -112,25 +137,17 @@ print("Number of events: ", len(file_h5['E']))  # count the number of events in 
 # make sure the number of events is the same in both files
 assert len(df_pred) == len(file_h5['E']), print('{} != {}', len(df_pred), len(file_h5['E']))
 
-# In[47]:
-
 
 # define path to save some plots (the local dir).
-LOCAL_PLOT_BASE_DIR = '/Users/michaeldolce/Desktop/ml-vertexing-plots/fd-validation' + '/' + pred_filename_prefix
-
-# TODO: need to extract the flux too eventually...
-PLOT_DIR = 'FD-{}-Fluxswap-{}'.format(HORN, COORDINATE.upper())
-
-OUTDIR = LOCAL_PLOT_BASE_DIR + '/' + PLOT_DIR
-print('plot outdir is: {}'.format(OUTDIR))
+OUTDIR = ('/Users/michaeldolce/Desktop/ml-vertexing-plots/analysis/'
+          + pred_filename_prefix
+          + '/ resolution')
 
 if not os.path.exists(OUTDIR):
     os.makedirs(OUTDIR)
     print('created dir: {}'.format(OUTDIR))
 else:
     print('dir already exists: {}'.format(OUTDIR))
-
-# In[48]:
 
 
 # create dataframe from the h5 validation file
@@ -154,20 +171,18 @@ df = pd.DataFrame({'E': file_h5['E'][:],
                    'vtxEA.z': file_h5['vtxEA.z'][:],
                    })
 
-# In[49]:
 
 # Add in the Model Prediction.
 df = pd.concat([df, df_pred], axis=1)
-print(df.head())
-
-# In[50]:
+if args.verbose:
+    print(df.head())
 
 
 # Add the following columns: absolute vertex difference between...
 # -- abs(E.A. - True) vertex
 # -- abs(Model - True) vertex.
 
-print('Creating "AbsVtxDiff.EA.{}" and "AbsVtxDiff.Model{}" column'.format(COORDINATE, COORDINATE))
+print('Creating "AbsVtxDiff.EA.{}" and "AbsVtxDiff.Model.{}" column'.format(COORDINATE, COORDINATE))
 vtx_diff_temp = pd.DataFrame(abs(df['vtx.{}'.format(COORDINATE)] - df['vtxEA.{}'.format(COORDINATE)]),
                              columns=['AbsVtxDiff.EA.{}'.format(COORDINATE)])
 vtx_diff_temp_Model = pd.DataFrame(abs(df['vtx.{}'.format(COORDINATE)] - df['Model Pred {}'.format(COORDINATE)]),
@@ -181,13 +196,12 @@ E_nova = df[df['E'] < 5]
 df['E NOvA'] = E_nova['E']
 df.describe()
 
-print(df.head())  # check the head of the dataframe
-df.describe()  # describe the dataframe
-print(df.columns)  # print the columns of the dataframe
-# df.info() # get info on the dataframe
+if args.verbose:
+    print(df.head())  # check the head of the dataframe
+    df.describe()  # describe the dataframe
+    print(df.columns)  # print the columns of the dataframe
+    # df.info() # get info on the dataframe
 
-
-# In[53]:
 
 
 # Interaction types.
@@ -262,145 +276,15 @@ for i in range(0, len(mode_names)):
     df_modes.append(df[df['Mode'] == i])
 
 # just as a simple check, print out the head of the QE events.
-print('printing out head() for QE events...')
-df_modes[1].head()
-print(df_modes[1].columns)
+if args.verbose:
+    print('printing out head() for QE events...')
+    df_modes[1].head()
+    print(df_modes[1].columns)
 
-# In[55]:
+print('Creating plots..................')
 
-# Vertex Location plots
-
-# Plot the Reco vs. True vertex for the nue events broken down by interaction type
-
-print('PLOTTING THE TRUE VS. E.A. & Model VERTEX Location FOR EACH INTERACTION TYPE......')
-print('coordinate.....{}'.format(COORDINATE))
-VTX_LOCATION = 'vertex-location'
-
-if not os.path.exists(OUTDIR + '/' + VTX_LOCATION):
-    os.makedirs(OUTDIR + '/' + VTX_LOCATION)
-    print('created dir: {}'.format(OUTDIR + '/' + VTX_LOCATION))
-else:
-    print('dir already exists: {}'.format(OUTDIR + '/' + VTX_LOCATION))
-
-for i in range(0, len(mode_names)):
-    if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
-        continue
-    fig_reco_true = plt.figure(figsize=(10, 10))
-    ax_VtxLocation = fig_reco_true.add_subplot(111)
-    ax_VtxLocation.scatter(df_modes[i]['vtx.{}'.format(COORDINATE)][:], df_modes[i]['vtxEA.{}'.format(COORDINATE)][:],
-                           s=1, label='Elastic Arms')
-    ax_VtxLocation.scatter(df_modes[i]['vtx.{}'.format(COORDINATE)][:],
-                           df_modes[i]['Model Pred {}'.format(COORDINATE)][:], s=1, marker='x', color='orange',
-                           label='Model Pred.')
-    plt.title('{} Vertex Location'.format(mode_names[i]))
-    plt.xlabel('True Vtx {} [cm]'.format(COORDINATE))
-    plt.ylabel('Reco. Vtx {} [cm]'.format(COORDINATE))
-    plt.plot(np.arange(-750, 750, 1), np.arange(-750, 750, 1), '--', lw=1.5, color='gray')
-    plt.legend(loc='upper left')
-    plt.text(550, 1000, 'FD {} Fluxswap \n {} Vertex\n Validation'.format(HORN, COORDINATE), fontsize=12)
-
-    # plt.xlim(-150, 150)
-    # plt.ylim(-150, 150)
-    # plt.show()
-
-    for ext in ['pdf', 'png']:
-        fig_reco_true.savefig(
-            OUTDIR + '/' + VTX_LOCATION + '/FD_{}_Fluxswap_EA_and_Model_vs_true_vtx_{}.{}.'.format(
-                HORN, COORDINATE, mode_names[i]) + ext, dpi=300)
-
-print(df_modes[1].columns)
-
-# # Vertex vs. Energy plots
-
-# In[56]:
-
-
-# Plot the average "distance" between the E.A. Vertex and the True Vtx. 
-VTX_V_ENERGY = 'vertex-vs-energy'
-
-if not os.path.exists(OUTDIR + '/' + VTX_V_ENERGY):
-    os.makedirs(OUTDIR + '/' + VTX_V_ENERGY)
-    print('created dir: {}'.format(OUTDIR + '/' + VTX_V_ENERGY))
-else:
-    print('dir already exists: {}'.format(OUTDIR + '/' + VTX_V_ENERGY))
-
-for i in range(0, len(mode_names)):
-    # ignore the empty Interaction dataframes 
-    if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
-        continue
-
-    fig_Enu = plt.figure(figsize=(7, 5))
-    ax_VtxEnergy = fig_Enu.add_subplot(111)
-
-    ax_VtxEnergy.scatter(df_modes[i]['E'], df_modes[i]['AbsVtxDiff.EA.{}'.format(COORDINATE)], marker='.', s=1,
-                         label='Elastic Arms')
-    ax_VtxEnergy.scatter(df_modes[i]['E'], df_modes[i]['AbsVtxDiff.Model.{}'.format(COORDINATE)], marker='.', s=1,
-                         label='Model Pred.')
-
-    plt.title('{} Interactions'.format(mode_names[i]))
-    plt.xlabel('True Energy [GeV]')
-    plt.ylabel('Abs. Vertex {} Difference [cm]'.format(COORDINATE))
-    plt.text(7.5, df_modes[i]['AbsVtxDiff.EA.{}'.format(COORDINATE)].max() * 0.95,
-             'Events {}\n {} Coordinate'.format(len(df_modes[i]), COORDINATE), fontsize=12)
-    plt.legend(loc='upper right')
-    plt.show()
-
-    for ext in ['pdf', 'png']:
-        fig_Enu.savefig(
-            OUTDIR + '/' + VTX_V_ENERGY + '/plot_FD_{}_Fluxswap_abs_diff_EA_and_Model_vtx.{}_vs_E_{}.'.format(
-                HORN, COORDINATE, mode_names[i]) + ext, dpi=300)
-
-# ## Vertex vs. Energy plots (NOvA Energy)
-
-# In[57]:
-
-
-# Plot the average "distance" between the E.A. Vertex and the True Vtx.
-# make another set of plots that is within the energy range of NOvA 0-5 GeV...
-VTX_V_ENERGY_NOVA = 'vertex-vs-energy-NOvA'
-
-if not os.path.exists(OUTDIR + '/' + VTX_V_ENERGY_NOVA):
-    os.makedirs(OUTDIR + '/' + VTX_V_ENERGY_NOVA)
-    print('created dir: {}'.format(OUTDIR + '/' + VTX_V_ENERGY_NOVA))
-else:
-    print('dir already exists: {}'.format(OUTDIR + '/' + VTX_V_ENERGY_NOVA))
-
-for i in range(0, len(mode_names)):
-    # ignore the empty Interaction dataframes 
-    if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
-        continue
-
-    fig_nova_E = plt.figure(figsize=(7, 5))
-    ax_NOvAVtxEnergy = fig_nova_E.add_subplot(111)
-
-    print('length of df[{}] {}'.format(mode_names[i], len(df_modes[i])))
-
-    ax_NOvAVtxEnergy.scatter(df_modes[i]['E NOvA'], df_modes[i]['AbsVtxDiff.EA.{}'.format(COORDINATE)], s=1, marker='.',
-                             label='Elastic Arms')
-    ax_NOvAVtxEnergy.scatter(df_modes[i]['E NOvA'], df_modes[i]['AbsVtxDiff.Model.{}'.format(COORDINATE)], s=1,
-                             marker='.', label='Model Pred.')
-    plt.title('{} Interactions'.format(mode_names[i]))
-    plt.xlabel('Energy [GeV]')
-    plt.ylabel('Abs. Vertex {} Difference [cm]'.format(COORDINATE))
-    plt.text(2.5, df_modes[i]['AbsVtxDiff.EA.{}'.format(COORDINATE)].max() * 0.95, 'Events {}'.format(len(df_modes[i])),
-             fontsize=8)
-    plt.legend(loc='upper right')
-
-    for ext in ['pdf', 'png']:
-        fig_nova_E.savefig(
-            OUTDIR + '/' + VTX_V_ENERGY_NOVA + '/plot_FD_{}_Fluxswap_abs_diff_vtx.{}_vs_E_NOvA_{}.'.format(
-                HORN, COORDINATE, mode_names[i]) + ext, dpi=300)
-
-#  # Resolution plots
-# 
-
-# ### Define the binning here...
-
-# In[58]:
-
+############# Resolution plots ############
+# Histograms. Define the binning here...
 
 # for reco - true vertex. 
 bins_resolution = np.arange(-40, 40, 1)  # 1 bin per cm. 
@@ -411,58 +295,56 @@ bins_abs_resolution = np.arange(0, 50, 1)  # 1 bin per cm.
 # for (reco - true)/true vertex difference
 bins_relative_resolution = np.arange(-0.2, 0.2, .01)  # edges at +- 20%
 
-# ### define the plot names...
+############### Metrics ###############
+# directly calculate the mean and RMS from the dataframe.
+mean_Model = np.mean(df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)])
+rms_Model = np.sqrt(np.mean((df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) ** 2))
 
-# In[59]:
-
-
-RESOLUTION = 'resolution'  # outdir name
-
-if not os.path.exists(OUTDIR + '/' + RESOLUTION):
-    os.makedirs(OUTDIR + '/' + RESOLUTION)
-    print('created dir: {}'.format(OUTDIR + '/' + RESOLUTION))
-else:
-    print('dir already exists: {}'.format(OUTDIR + '/' + RESOLUTION))
-
-# ## All interactions
-
-# In[60]:
+mean_EA = np.mean(df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)])
+rms_EA = np.sqrt(np.mean((df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) ** 2))
 
 
-# ELASTIC ARMS
-
+# All interactions
+# ELASTIC ARMS, ONLY
 # plot the resolution of the vertex for each interaction type on single plot.
 fig_res_int_EA = plt.figure(figsize=(10, 8))
 
 for i in range(0, len(mode_names)):
     # ignore the empty Interaction dataframes 
     if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
+        if args.verbose:
+            print('skipping ' + mode_names[i])
         continue
 
     df_mode = df_modes[i]
     hist_EA_all, bins_all, patches_all = plt.hist(
-        df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)], bins=bins_resolution,
-        range=(-50, 50), color=mode_colors[mode_names[i]], alpha=0.5, label=mode_names[i])
+        df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)],
+        bins=bins_resolution,
+        range=(-50, 50),
+        color=mode_colors[mode_names[i]],
+        alpha=0.5,
+        label=mode_names[i])
+
 
 plt.title('Elastic Arms Vertex Resolution')
 plt.xlabel('Reco. - True Vertex {} [cm]'.format(COORDINATE))
 plt.ylabel('Events')
-plt.text(25, 1e4, 'FD {} Fluxswap\nElastic Arms\n{} coordinate'.format(HORN, COORDINATE), fontsize=12)
+plt.text(15, 9e3, '{} {} {}\nElastic Arms\n{} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE), fontsize=12)
+plt.text(15, 5e3, 'Mean: {:.2f} cm\nRMS: {:.2f} cm'.format(mean_EA, rms_EA), fontsize=12)
 plt.legend(loc='upper right')
 plt.subplots_adjust(bottom=0.15, left=0.15)
 plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
-plt.show()
+# plt.show()
+
 
 for ext in ['pdf', 'png']:
     fig_res_int_EA.savefig(
-        OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_allmodes_Resolution_{}_ElatsticArms.'.format(
-            HORN, COORDINATE) + ext, dpi=300)
-
-# In[61]:
+        OUTDIR + '/plot_{}_{}_{}_allmodes_Resolution_{}_ElasticArms.'.format(
+            DETECTOR, HORN, FLUX, COORDINATE) + ext, dpi=300)
 
 
-# Model Prediction
+
+# Model Prediction, ONLY
 
 # plot the resolution of the vertex for each interaction type on single plot.
 fig_res_int_Model = plt.figure(figsize=(10, 8))
@@ -470,195 +352,268 @@ fig_res_int_Model = plt.figure(figsize=(10, 8))
 for i in range(0, len(mode_names)):
     # ignore the empty Interaction dataframes 
     if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
+        if args.verbose:
+            print('skipping ' + mode_names[i])
         continue
 
     df_mode = df_modes[i]
     hist_Model_all, bins_all, patches_all = plt.hist(
-        df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)], bins=bins_resolution,
-        range=(-50, 50), color=mode_colors_Model[mode_names[i]], alpha=0.5, label=mode_names[i])
+        df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)],
+        bins=bins_resolution,
+        range=(-50, 50),
+        color=mode_colors_Model[mode_names[i]],
+        alpha=0.5,
+        label=mode_names[i])
+
 
 plt.title('Model Prediction Resolution')
 plt.xlabel('Reco. - True Vertex {} [cm]'.format(COORDINATE))
 plt.ylabel('Events')
-plt.text(25, 20, 'FD {} Fluxswap\nModel Prediction\n{} coordinate'.format(HORN, COORDINATE), fontsize=12)
+plt.text(25, 15e3, '{} {} {}\nModel Prediction\n{} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE), fontsize=12)
+plt.text(25, 5e3, 'Mean: {:.2f} cm\nRMS: {:.2f} cm'.format(mean_Model, rms_Model), fontsize=12)
 plt.legend(loc='upper right')
 plt.subplots_adjust(bottom=0.15, left=0.15)
 plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
-plt.show()
+# plt.show()
 
 for ext in ['pdf', 'png']:
     fig_res_int_Model.savefig(
-        OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_allmodes_Resolution_{}_ModelPred.'.format(
-            HORN, COORDINATE) + ext, dpi=300)
-
-# ### Abs(resolution)
-
-# In[62]:
+        OUTDIR + '/plot_{}_{}_{}_allmodes_Resolution_{}_ModelPred.'.format(
+            DETECTOR, HORN, FLUX, COORDINATE) + ext, dpi=300)
 
 
-# plot the abs(reco - true) vertex difference for all events
+
+
+# Abs(resolution)
+# plot the abs(reco - true) vertex difference for both: Elastic Arms and Model Prediction
 
 fig_resolution = plt.figure(figsize=(5, 3))
 
-hist_EA, bins_EA, patches_EA = plt.hist(df['AbsVtxDiff.EA.{}'.format(COORDINATE)], bins=bins_abs_resolution,
-                                        range=(-50, 50), color='black', alpha=0.5, label='Elastic Arms')
-hist_Model, bins_Model, patches_Model = plt.hist(df['AbsVtxDiff.Model.{}'.format(COORDINATE)], bins=bins_abs_resolution,
-                                                 range=(-50, 50), color='orange', alpha=0.5, label='Model Pred.')
+hist_EA_abs, bins_EA_abs, patches_EA_abs = plt.hist(df['AbsVtxDiff.EA.{}'.format(COORDINATE)],
+                                        bins=bins_abs_resolution,
+                                        range=(-50, 50),
+                                        color='black',
+                                        alpha=0.5,
+                                        label='Elastic Arms',
+                                        hatch='//')
+
+hist_Model_abs, bins_Model_abs, patches_Model_abs = plt.hist(df['AbsVtxDiff.Model.{}'.format(COORDINATE)],
+                                                 bins=bins_abs_resolution,
+                                                 range=(-50, 50),
+                                                 color='orange',
+                                                 alpha=0.5,
+                                                 label='Model Pred.')
+
+# NOTE: calculate the mean and RMS from the histogram here.
+
 plt.xlabel('|Reco - True| Vertex [cm]')
 plt.ylabel('Events')
-plt.text(30, hist_EA.max() * 0.6, 'FD {} Fluxswap\nAll Interactions\n {} coordinate'.format(HORN, COORDINATE),
+plt.text(30, hist_EA_abs.max() * 0.6, '{} {} {}\nAll Interactions\n {} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE),
          fontsize=8)
+plt.text(30, hist_EA_abs.max() * 0.45, 'Mean E.A.: {:.2f} cm\nMean Model: {:.2f} cm'.format(df['AbsVtxDiff.EA.{}'.format(COORDINATE)].mean(), df['AbsVtxDiff.Model.{}'.format(COORDINATE)].mean()), fontsize=8)
 plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 plt.legend(loc='upper right')
 plt.subplots_adjust(bottom=0.15, left=0.15)
 
-plt.show()
+# plt.show()
 for ext in ['pdf', 'png']:
-    fig_resolution.savefig(OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_allmodes_{}_AbsResolution.'.
-                           format(HORN,COORDINATE) + ext, dpi=300)
-
-# ### Resolution
-
-# In[63]:
+    fig_resolution.savefig(OUTDIR + '/plot_{}_{}_{}_allmodes_{}_AbsResolution.'.
+                           format(DETECTOR, HORN, FLUX, COORDINATE) + ext, dpi=300)
 
 
-# plot the (reco - true) vertex difference for all events
 
+
+# Resolution
+# plot the (reco - true) vertex difference for both: Elastic Arms and Model Prediction
 fig_resolution = plt.figure(figsize=(5, 3))
 
 hist_EA_all_res, bins_EA_all_res, patches_EA_all_res = plt.hist(
-    df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)], bins=bins_resolution, color='black', alpha=0.5,
-    label='Elastic Arms')
+    df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)],
+    bins=bins_resolution,
+    color='black',
+    alpha=0.5,
+    label='Elastic Arms',
+    hatch='//')
+
 hist_Model_all_res, bins_Model_all_res, patches_Model_all_res = plt.hist(
-    df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)], bins=bins_resolution, color='orange',
-    alpha=0.5, label='Model Pred.')
+    df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)],
+    bins=bins_resolution,
+    color='orange',
+    alpha=0.5,
+    label='Model Pred.')
+
 # plt.hist(np.clip(hist_Model_all_res, bins_Model_all_res[0], bins_Model_all_res[-1]), bins=bins_resolution, color='orange', alpha=0.5, label='Model Pred.')
+
+plt.text(14, 4e4, 'Mean E.A.: {:.2f} cm\nRMS E.A.: {:.2f} cm'.format(mean_EA, rms_EA), fontsize=8)
+plt.text(14, 2e4, 'Mean Model: {:.2f} cm\nRMS Model: {:.2f} cm'.format(mean_Model, rms_Model), fontsize=8)
 plt.xlabel('(Reco - True) Vertex {} [cm]'.format(COORDINATE))
 plt.ylabel('Events')
-plt.text(-40, hist_EA_all_res.max() * 0.75, 'FD {} Fluxswap\nAll Interactions\n {} coordinate'.format(HORN, COORDINATE),
-         fontsize=8)
+plt.text(-40, hist_EA_all_res.max() * 0.75, '{} {} {}\nAll Interactions\n {} coordinate'.format(
+    DETECTOR, HORN, FLUX, COORDINATE), fontsize=8)
 plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 plt.legend(loc='upper right')
 plt.subplots_adjust(bottom=0.15, left=0.15)
 
-plt.show()
+# plt.show()
 for ext in ['pdf', 'png']:
     fig_resolution.savefig(
-        OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_allmodes_{}_resolution.'.format(HORN, COORDINATE) + ext,
+        OUTDIR + '/plot_{}_{}_{}_allmodes_{}_resolution.'.format(DETECTOR, HORN, FLUX, COORDINATE) + ext,
         dpi=300)
 
-# ### Relative Resolution
-
-# In[64]:
 
 
-# plot the (reco - true)/true vertex difference for all events
 
+
+# Relative Resolution
+# plot the (reco - true)/true vertex difference for both:
+# Elastic Arms and Model Prediction
 fig_resolution = plt.figure(figsize=(5, 3))
+
+# NOTE: RMS of the residual is not reported.
+mean_EA_all_relres = ((df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) / df['vtx.{}'.format(COORDINATE)]).mean()
+mean_float_EA_all_relres = float(mean_EA_all_relres)
+mean_Model_all_relres = ((df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) / df['vtx.{}'.format(COORDINATE)]).mean()
+mean_float_Model_all_relres = float(mean_Model_all_relres)
 
 hist_EA_all_relres, bins_EA_all_relres, patches_EA_all_relres = plt.hist(
     (df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) / df['vtx.{}'.format(COORDINATE)],
-    bins=bins_relative_resolution, color='black', alpha=0.5, label='Elastic Arms')
+    bins=bins_relative_resolution,
+    color='black',
+    alpha=0.5,
+    label='Elastic Arms',
+    hatch='//')
+
 hist_Model_all_relres, bins_Model_all_relres, patches_Model_all_relres = plt.hist(
     (df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) / df['vtx.{}'.format(COORDINATE)],
-    bins=bins_relative_resolution, color='orange', alpha=0.5, label='Model Pred.')
-plt.xlabel('(Reco - True)/True [cm]')
+    bins=bins_relative_resolution,
+    color='orange',
+    alpha=0.5,
+    label='Model Pred.')
+plt.xlabel('(Reco - True)/True {}'.format(COORDINATE))
 plt.ylabel('Events')
-plt.text(0.13, hist_EA.max() * 0.7, 'FD {} Fluxswap\nAll Interactions\n {} coordinate'.format(HORN, COORDINATE),
+plt.text(0.05, hist_EA_all_relres.max() * 0.7, '{} {} {}\nAll Interactions\n {} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE),
+         fontsize=8)
+plt.text(0.05,hist_EA_all_relres.max() * 0.5,
+         f'Mean E.A.: {mean_float_EA_all_relres:.3f} cm\nMean Model: {mean_float_Model_all_relres:.3f} cm',
          fontsize=8)
 plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 plt.legend(loc='upper right')
 plt.subplots_adjust(bottom=0.15, left=0.15)
 
-plt.show()
+# plt.show()
 for ext in ['pdf', 'png']:
     fig_resolution.savefig(
-        OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_allmodes_{}_RelResolution.'.format(
-            HORN, COORDINATE) + ext, dpi=300)
-
-# ## Interaction type
-
-# In[65]:
+        OUTDIR + '/plot_{}_{}_{}_allmodes_{}_RelResolution.'.format(
+            DETECTOR, HORN, FLUX, COORDINATE) + ext, dpi=300)
 
 
-# plot the abs(reco - true) resolution of the vertex for each interaction type
-
-# TODO: need to save these interaction type plots to a separate dir...!
+# Interaction type
+# plot the abs(reco - true) resolution of the vertex for EACH INTERACTION TYPE
+# for both: Elastic Arms and Model Prediction
 
 for i in range(0, len(mode_names)):
     # ignore the empty Interaction dataframes 
     if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
+        if args.verbose:
+            print('skipping ' + mode_names[i])
         continue
     fig_resolution_int = plt.figure(figsize=(5, 3))
 
     df_mode = df_modes[i]  # need to save the dataframe to a variable
-    hist_EA, bins, patches = plt.hist(df_mode['AbsVtxDiff.EA.{}'.format(COORDINATE)], bins=bins_abs_resolution,
-                                      range=(-50, 50), color=mode_colors[mode_names[i]], alpha=0.5,
-                                      label='Elastic Arms')
+    hist_EA, bins, patches = plt.hist(df_mode['AbsVtxDiff.EA.{}'.format(COORDINATE)],
+                                      bins=bins_abs_resolution,
+                                      range=(-50, 50),
+                                      color=mode_colors[mode_names[i]],
+                                      alpha=0.5,
+                                      label='Elastic Arms',
+                                      hatch='//')
     hist_Model, bins_Model, patches_Model = plt.hist(df_mode['AbsVtxDiff.Model.{}'.format(COORDINATE)],
-                                                     bins=bins_abs_resolution, range=(-50, 50),
-                                                     color=mode_colors_Model[mode_names[i]], alpha=0.5,
+                                                     bins=bins_abs_resolution,
+                                                     range=(-50, 50),
+                                                     color=mode_colors_Model[mode_names[i]],
+                                                     alpha=0.5,
                                                      label='Model Pred.')
+
+    # NOTE: no RMS for these plots.
     plt.title('{} Interactions'.format(mode_names[i]))
     plt.xlabel('|Reco.  - True| Vertex [cm]')
     plt.ylabel('Events')
-    plt.text(35, hist_EA.max() * 0.6, 'FD {} Fluxswap\n{} coordinate'.format(HORN, COORDINATE), fontsize=8)
+    plt.text(35, hist_EA.max() * 0.6, '{} {} {}\n{} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE), fontsize=8)
+    plt.text(35, hist_EA.max() * 0.45, 'Mean E.A.: {:.2f} cm\nMean Model: {:.2f} cm'.format(df_mode['AbsVtxDiff.EA.{}'.format(COORDINATE)].mean(), df_mode['AbsVtxDiff.Model.{}'.format(COORDINATE)].mean()), fontsize=8)
     plt.legend(loc='upper right')
     plt.subplots_adjust(bottom=0.15, left=0.15)
     plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 
-    plt.show()
+    # plt.show()
     for ext in ['pdf', 'png']:
-        fig_resolution_int.savefig(OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_{}_AbsResolution_{}.'.
-                                   format(HORN, COORDINATE, mode_names[i]) + ext, dpi=300)
-
-# In[66]:
+        fig_resolution_int.savefig(OUTDIR + '/plot_{}_{}_{}_{}_AbsResolution_{}.'.
+                                   format(DETECTOR, HORN, FLUX, COORDINATE, mode_names[i]) + ext, dpi=300)
 
 
-# plot the (reco - true) resolution of the vertex for each interaction type
-
+# FOR EACH INTERACTION TYPE
+# plot the (reco - true) resolution of the vertex
+# for both: Elastic Arms and Model Prediction
 for i in range(0, len(mode_names)):
     # ignore the empty Interaction dataframes 
     if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
+        if args.verbose:
+            print('skipping ' + mode_names[i])
         continue
 
     fig_res_int = plt.figure(figsize=(5, 3))
 
     df_mode = df_modes[i]
     hist_EA, bins_EA, patches_EA = plt.hist(
-        df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)], bins=bins_resolution,
-        range=(-50, 50), color=mode_colors[mode_names[i]], alpha=0.5, label='Elastic Arms')
+        df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)],
+        bins=bins_resolution,
+        range=(-50, 50),
+        color=mode_colors[mode_names[i]],
+        alpha=0.5,
+        label='Elastic Arms',
+        hatch='//')
+
     hist_Model, bins_Model, patches_Model = plt.hist(
-        df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)], bins=bins_resolution,
-        range=(-50, 50), color=mode_colors_Model[mode_names[i]], alpha=0.5, label='Model Pred.')
+        df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)],
+        bins=bins_resolution,
+        range=(-50, 50),
+        color=mode_colors_Model[mode_names[i]],
+        alpha=0.5,
+        label='Model Pred.')
+
+    # Calculate the mean and RMS individually inside the loop here
+    mean_int_EA = np.mean(df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)])
+    mean_int_Model = np.mean(df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)])
+
+    rms_int_EA = np.sqrt(np.mean((df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)]) ** 2))
+    rms_int_Model = np.sqrt(np.mean((df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)]) ** 2))
+
     plt.xlabel('Reco. - True Vertex [cm]')
     plt.ylabel('Events')
     plt.title('{} Interactions'.format(mode_names[i]))
-    plt.text(20, hist_EA.max() * 0.55, 'FD {} Fluxswap\n{} coordinate'.format(HORN, COORDINATE), fontsize=8)
+    plt.text(20, hist_EA.max() * 0.55, '{} {} {}\n{} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE), fontsize=8)
+    plt.text(20, hist_EA.max() * 0.45, 'Mean E.A.: {:.2f} cm\nMean Model: {:.2f} cm'.format(mean_int_EA, mean_int_Model), fontsize=8)
+    plt.text(20, hist_EA.max() * 0.3, 'RMS E.A.: {:.2f} cm\nRMS Model: {:.2f} cm'.format(rms_int_EA, rms_int_Model), fontsize=8)
     plt.legend(loc='upper right')
     plt.subplots_adjust(bottom=0.15, left=0.15)
     plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 
-    plt.show()
+    # plt.show()
     for ext in ['pdf', 'png']:
-        fig_res_int.savefig(
-            OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_{}_Resolution_{}.'.format(HORN,
-                                                                                        COORDINATE,
-                                                                                        mode_names[i]) + ext, dpi=300)
+        fig_res_int.savefig(OUTDIR + '/plot_{}_{}_{}_{}_Resolution_{}.'.format(DETECTOR,
+                                                                                  HORN,
+                                                                                  FLUX,
+                                                                                  COORDINATE,
+                                                                                  mode_names[i]) + ext, dpi=300)
 
-# In[67]:
 
-
+# FOR EACH INTERACTION TYPE
 # plot the relative resolution (reco - true)/true
-
-
+# for both: Elastic Arms and Model Prediction
 for i in range(0, len(mode_names)):
     # ignore the empty Interaction dataframes 
     if df_modes[i].empty:
-        print('skipping ' + mode_names[i])
+        if args.verbose:
+            print('skipping ' + mode_names[i])
         continue
     fig_res_int = plt.figure(figsize=(5, 3))
 
@@ -666,22 +621,32 @@ for i in range(0, len(mode_names)):
     hist_EA, bins, patches = plt.hist(
         (df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)]) / df_mode[
             'vtx.{}'.format(COORDINATE)], bins=bins_relative_resolution, range=(-50, 50),
-        color=mode_colors[mode_names[i]], alpha=0.5, label='Elastic Arms')
+        color=mode_colors[mode_names[i]], alpha=0.5, label='Elastic Arms', hatch='//')
     hist_Model, bins_Model, patches_Model = plt.hist(
         (df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)]) / df_mode[
             'vtx.{}'.format(COORDINATE)], bins=bins_relative_resolution, range=(-50, 50),
         color=mode_colors_Model[mode_names[i]], alpha=0.5, label='Model Pred.')
-    plt.xlabel('(Reco - True)/True Vertex {} [cm]'.format(COORDINATE))
+
+    # NOTE: we do not report the RMS of a residual here, that doesn't make sense...
+    # NOTE: RMS of the residual is not reported.
+    mean_EA_int_relres = float(((df_mode['vtxEA.{}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)]) / df_mode[
+        'vtx.{}'.format(COORDINATE)]).mean())
+
+    mean_Model_int_relres = float(((df_mode['Model Pred {}'.format(COORDINATE)] - df_mode['vtx.{}'.format(COORDINATE)]) / df_mode[
+        'vtx.{}'.format(COORDINATE)]).mean())
+
+    plt.xlabel('(Reco - True)/True Vertex {}'.format(COORDINATE))
     plt.ylabel('Events')
-    plt.text(0.1, hist_EA.max() * 0.55, 'FD {} Fluxswap\n{} coordinate'.format(HORN, COORDINATE), fontsize=8)
+    plt.title('{} Interactions'.format(mode_names[i]))
+    plt.text(0.05, hist_EA.max() * 0.55, '{} {} {}\n{} coordinate'.format(DETECTOR, HORN, FLUX, COORDINATE), fontsize=8)
+    plt.text(0.05, hist_EA.max() * 0.4, 'Mean E.A.: {:.3f} cm\nMean Model: {:.3f} cm'.format(mean_EA_int_relres, mean_Model_int_relres), fontsize=8)
     plt.legend(loc='upper right')
     plt.subplots_adjust(bottom=0.15, left=0.15)
     plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 
-    plt.show()
+    # plt.show()
     for ext in ['pdf', 'png']:
-        fig_res_int.savefig(OUTDIR + '/' + RESOLUTION + '/plot_FD_{}_Fluxswap_{}_RelResolution_{}.'.
-                            format(HORN, COORDINATE, mode_names[i]) + ext, dpi=300)
+        fig_res_int.savefig(OUTDIR + '/plot_{}_{}_{}_{}_RelResolution_{}.'.
+                            format(DETECTOR, HORN, FLUX, COORDINATE, mode_names[i]) + ext, dpi=300)
 
-# TODO: should look into making a box plot somehow....
-# make the width of the box the 10% difference from the mean or something like it?
+
