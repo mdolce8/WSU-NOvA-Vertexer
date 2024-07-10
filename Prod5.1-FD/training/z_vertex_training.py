@@ -56,9 +56,9 @@ def convert_vtx_z_to_pixelmap(vtx_z_array, firstplane_array, det):
     print('Converting z coordinate for {}...'.format(det))
     assert (type(vtx_z_array) is np.ndarray), "z_array must be a numpy array"
     if det == 'ND':
-        return vtx_z_array / 6.61 - firstplane_array
+       return vtx_z_array / 6.61 - firstplane_array    #Make sure that conversion factor 6.61 is the same in when you try to convert back to the detector coordinate in your predictions script 
     elif det == 'FD':
-        return vtx_z_array / 6.664 - firstplane_array
+        return vtx_z_array / 6.664 - firstplane_array  #maintain the conversion factor 6.664 for FD when you are trying to convert back to the detector coordinate in your prediction script
     else:
         print('NO DETECTOR. No Z coordinate conversion.')
         return None
@@ -364,10 +364,10 @@ print('========================================')
 print('Final printout of shape before feeding into network......')
 print('training: (after final reshaping)')
 print('XZ_train_feature.shape: ', XZ_train_feature_x.shape)
-print('YZ_train_feature.shape: ', YZ_train_feature_x.shape)
+#print('YZ_train_feature.shape: ', YZ_train_feature_x.shape)
 print('testing:')
 print('XZ_test_feature.shape: ', XZ_test_feature_x.shape)
-print('YZ_test_feature.shape: ', YZ_test_feature_x.shape)
+#print('YZ_test_feature.shape: ', YZ_test_feature_x.shape)
 print('========================================')
 
 # ### MultiView Fully Connected Layer Regression CNN Model
@@ -376,7 +376,7 @@ print('using XZ and YZ views for training the model on `z` coordinate')
 
 # instantiate the model
 model_regCNN_xz = Sequential()
-model_regCNN_yz = Sequential()
+#model_regCNN_yz = Sequential()
 # add two fully connected 2-dimensional convolutional layers for the XZ and YZ views
 model_regCNN_xz.add(Conv2D(filters=32, kernel_size=(2, 2), strides=(1, 1),
                            input_shape=(100, 80, 1), activation='relu'))
@@ -407,20 +407,20 @@ model_regCNN_yz.add(Dense(256, activation='relu'))
 model_regCNN_yz.add(Dense(256, activation='relu'))
 #model_regCNN_yz.add(AveragePooling2D(pool_size=(2,2)))
 
-#Taking mean of both xz and yz
-#model_regCNN_xz_mean = GlobalAveragePooling1D()(model_regCNN_xz)
-#model_regCNN_yz_mean = GlobalAveragePooling1D()(model_regCNN_yz)
+#class for a dense layer
+n_classes = 1
 
 #trying to output each model first (xz and yz)
-#output_xz=Dense(n_classes)(model_regCNN_xz.output)
-#output_yz=Dense(n_classes)(model_regCNN_yz.output)
+output_xz=Dense(n_classes)(model_regCNN_xz.output)
+output_yz=Dense(n_classes)(model_regCNN_yz.output)
 
 #finding the mean for each output
 #model_mean_output_xz=tf.reduce_mean(output_xz, axis=0)
 #model_mean_output_yz=tf.reduce_mean(output_yz, axis=0)
-n_classes = 1
-# tf concatenate the models
+model_regCNN_xz_Dense= Dense(n_classes)(model_regCNN_xz.output)
 
+
+# To find the average of each (XZ and YZ) output, comment line 415 and 414 and uncomment line 424, 425, 429 and 430
 #output_xz=model_regCNN_xz.output
 #averaging_xz = Average()(output_xz) #This is averaging the output of xz
 #extracted_value_xz= Lambda(lambda x: K.mean(x, axis=-1, keepdims=True))(output_xz)   #This is to extract only the z value from the xz coordinate
@@ -429,61 +429,81 @@ n_classes = 1
 #output_yz=model_regCNN_yz.output
 #averaging_yz = Average()(output_yz) #This is averaging the output of yz
 #extracted_value_yz= Lambda(lambda x: K.mean(x, axis=-1, keepdims=True))(output_yz)   #This is to extract only the z value from the yz coordinate
-model_regCNN_concat= concatenate([model_regCNN_xz.output, model_regCNN_yz.output], axis=-1)
+#model_regCNN_concat= concatenate([model_regCNN_xz.output, model_regCNN_yz.output], axis=-1)
 
 #model_regCNN_concat= concatenate([extracted_value_xz, extracted_value_yz], axis=-1)
 #model_regCNN_concat= Average()([output_xz, output_yz])
-print("Shape of model_regCNN_concat:", model_regCNN_concat.shape)
-print("Shape of model_regCNN_xz output :", model_regCNN_xz.output.shape)
-print("Shape of model_regCNN_yz output :", model_regCNN_yz.output.shape)
+#print("Shape of model_regCNN_concat:", model_regCNN_concat.shape)
+#print("Shape of model_regCNN_xz output :", model_regCNN_xz.output.shape)
+#print("Shape of model_regCNN_yz output :", model_regCNN_yz.output.shape)
 #model_regCNN_Average= AveragePooling2D(pool_size=(2,2))(model_regCNN_xz.output, model_regCNN_yz.output], axis=-1)
 
 #Abdul adding this flatten layer to make the concat a 1D before the Dense layer
 #model_regCNN_mean_flatten = Flatten()(model_regCNN_mean)
 #input_layer_flatten = Input(shape=(100, 80, 1))
 
-#flatten_input = Flatten()(input_layer_flatten)
-#model_regCNN_concat= concatenate([model_regCNN_mean_flatten, flatten_input], axis=-1)
-
 #print("Shape of flatten_input:", flatten_input.shape)
 #print("Shape of model_regCNN_mean_flatten:", model_regCNN_mean_flatten.shape)
 #print("Shape of model_regCNN_concat:", model_regCNN_concat.shape)
 
 #number of class output
-print("Shape of model_regCNN_concat before  Dense:", model_regCNN_concat.shape)
+#print("Shape of model_regCNN_concat before  Dense:", model_regCNN_concat.shape)
 #model_regCNN_concat= Dense(n_classes)(model_regCNN_concat)
-print("Shape of model_regCNN_concat after Dense:", model_regCNN_concat.shape)
-model_regCNN = Model(inputs=[model_regCNN_xz.input, model_regCNN_yz.input], outputs=model_regCNN_concat)
-# compile the concatenated model
-model_regCNN.compile(loss='logcosh',
-                     optimizer='adam',
-                     metrics=['mse'])  # loss was 'mse' then 'mae'
-# print a summary of the model
-print(model_regCNN.summary())
+#print("Shape of model_regCNN_concat after Dense:", model_regCNN_concat.shape)
+#model_regCNN = Model(inputs=[model_regCNN_xz.input, model_regCNN_yz.input], outputs=model_regCNN_concat)
 
+
+#This is for training the XZ and YZ separately on the Z-Planes
+model_regCNN_YZ = Model(inputs=[model_regCNN_yz.input], outputs=output_yz)
+model_regCNN_XZ = Model(inputs=[model_regCNN_xz.input], outputs=output_xz)
+# compile the concatenated model
+#model_regCNN.compile(loss='logcosh',
+#                     optimizer='adam',
+#                     metrics=['mse'])  # loss was 'mse' then 'mae'
+# print a summary of the model
+
+#Compiling for the individual training
+model_regCNN_YZ.compile(loss='logcosh',
+                     optimizer='adam',
+                     metrics=['mse'])  # loss was 'mse' then 'mae
+print(model_regCNN_YZ.summary())
+model_regCNN_XZ.compile(loss='logcosh',
+                     optimizer='adam',
+                     metrics=['mse'])  # loss was 'mse' then 'mae
+print(model_regCNN_XZ.summary())
 
 # x-coordinate system.
 date = date.today()
 start = time.time()
 # todo: do we need to include both y (labels) here? or just one?
-model_regCNN.fit(x=[XZ_train_feature_x, YZ_train_feature_x], y=[XZ_train_label_y, YZ_train_label_y], epochs=args.epochs, batch_size=32, verbose=1, )
+#model_regCNN.fit(x=[XZ_train_feature_x, YZ_train_feature_x], y=[XZ_train_label_y, YZ_train_label_y], epochs=args.epochs, batch_size=32, verbose=1, )  #This line is for combining the XZ and YZ for the training
+
+#Training XZ and YZ separately
+model_regCNN_XZ.fit(x=[XZ_train_feature_x], y=[XZ_train_label_y], epochs=args.epochs, batch_size=32, verbose=1, ) #This is for XZ maps
+model_regCNN_YZ.fit(x=[YZ_train_feature_x], y=[YZ_train_label_y], epochs=args.epochs, batch_size=32, verbose=1, ) #This is for the YZ maps
 stop = time.time()
 print('Time to train: ', stop - start)
 
 # the default output name
 outputName = 'training_{}epochs_{}_{}_{}_Z_{}'.format(args.epochs, args.detector, args.horn, args.flux, date)
-
 save_model_dir = '/homes/m962g264/wsu_Nova_Vertexer/output/New-trained-model/'
-model_regCNN.save(save_model_dir + 'model_{}.h5'.format(outputName))
+#model_regCNN.save(save_model_dir + 'model_{}.h5'.format(outputName))
+model_regCNN_YZ.save(save_model_dir + 'model_YZ_{}.h5'.format(outputName))
+model_regCNN_XZ.save(save_model_dir + 'model_XZ_{}.h5'.format(outputName))
 print('saved model to: ', save_model_dir + 'model_{}.h5'.format(outputName))
 # Items in the model file: <KeysViewHDF5 ['model_weights', 'optimizer_weights']>
 
 # Save the metrics to a dataframe
-metrics = pd.DataFrame(model_regCNN.history.history)
+#metrics = pd.DataFrame(model_regCNN.history.history)
+metrics_xz = pd.DataFrame(model_regCNN_XZ.history.history)
+metrics_yz = pd.DataFrame(model_regCNN_YZ.history.history)
+
 print('METRICS:')
-print(metrics.head())
+print(metrics_xz.head())
+#print(metrics_yz.head())
 save_metric_dir = '/homes/m962g264/wsu_Nova_Vertexer/output/metrics/'
-metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(outputName))
+metrics_xz.to_csv(save_metric_dir + '/metrics_xz_{}.csv'.format(outputName))
+metrics_yz.to_csv(save_metric_dir + '/metrics_yz_{}.csv'.format(outputName))
 print('saved metrics to: ', save_metric_dir + '/metrics_{}.csv'.format(outputName))
 
 
@@ -495,11 +515,14 @@ if not os.path.isdir(plot_dir):
 
 # plot the training loss (among other metrics, for edification)
 plt.figure(figsize=(12, 8))
-plt.plot(metrics[['loss']])  # 'accuracy', 'mse']])  # TODO: add more metrics to this training.. accuracy, entropy. etc.
+#plt.plot(metrics[['loss']])  # 'accuracy', 'mse']])  # TODO: add more metrics to this training.. accuracy, entropy. etc.
+plt.plot(metrics_xz[['loss']], label='XZ')
+plt.plot(metrics_yz[['loss']], label='YZ')
 plt.xlabel('Epoch')
 plt.ylabel('Value')
 plt.title('Training Metrics')
-plt.legend(['loss'], loc='upper right')  # 'accuracy', 'mse'], loc='upper right')
+#plt.legend(['loss'], loc='upper right')  # 'accuracy', 'mse'], loc='upper right')
+plt.legend(['XZ-loss','YZ-loss'], loc='upper right')  # 'accuracy', 'mse'], loc='upper right')
 plt.tight_layout()
 plt.show()
 for ext in ['png', 'pdf']:
@@ -509,8 +532,11 @@ for ext in ['png', 'pdf']:
 # Evaluate the test set
 start_eval = time.time()
 print('Evaluation on the test set...')
-evaluation = model_regCNN.evaluate(x=[XZ_test_feature_x, YZ_test_feature_x], y=[XZ_test_label_y, YZ_test_label_y], verbose=1)
+#evaluation = model_regCNN.evaluate(x=[XZ_test_feature_x, YZ_test_feature_x], y=[XZ_test_label_y, YZ_test_label_y], verbose=1) #This is for evaluating the combine maps for training
+evaluation_xz = model_regCNN_XZ.evaluate(x=[XZ_test_feature_x], y=[XZ_test_label_y], verbose=1)
+evaluation_yz = model_regCNN_YZ.evaluate(x=[YZ_test_feature_x], y=[YZ_test_label_y], verbose=1)  
 stop_eval = time.time()
-print('Test Set Evaluation: {}'.format(evaluation))
+print('Test Set Evaluation: {}'.format(evaluation_xz))
+print('Test Set Evaluation: {}'.format(evaluation_yz))
 print('Evaluation time: ', stop_eval - start_eval)
 print('Done! Training Complete!')

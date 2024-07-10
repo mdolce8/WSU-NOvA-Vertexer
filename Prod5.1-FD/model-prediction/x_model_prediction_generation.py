@@ -97,7 +97,7 @@ def convY(y, fy):
   return (y+fy-47)*3.97
 
 def convZ(z, fz):
-  return (z+fz)*6.61
+  return (z+fz)*6.664  #Make sure this factor correspond to the factor in your training script to prevent any bias in the z coordinate
 
 ########### begin main script ###########
 
