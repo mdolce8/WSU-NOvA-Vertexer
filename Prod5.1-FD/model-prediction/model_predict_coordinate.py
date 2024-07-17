@@ -101,7 +101,7 @@ def convert_y_pixelmap_to_fd_detector_coordinates(y_pixelmap_array, firstcelly_a
   return (y_pixelmap_array + firstcelly_array - 191) * 3.97
 
 def convert_z_pixelmap_to_fd_detector_coordinates(z_pixelmap_array, firstplane_array):
-  return (z_pixelmap_array + firstplane_array) * 6.64
+  return (z_pixelmap_array + firstplane_array) * 6.664   #Make sure this factor is consistent to the factor in the training file
 ########### begin main script ###########
 
 
