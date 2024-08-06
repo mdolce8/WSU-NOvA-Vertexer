@@ -465,8 +465,8 @@ for r in ranges:
 
 # plt.hist(np.clip(hist_Model_all_res, bins_Model_all_res[0], bins_Model_all_res[-1]), bins=bins_resolution, color='orange', alpha=0.5, label='Model Pred.')
 
-plt.text(14, 4e4, 'Mean E.A.: {:.2f} cm\nRMS E.A.: {:.2f} cm'.format(mean_EA, rms_EA), fontsize=8)
-plt.text(14, 2e4, 'Mean Model: {:.2f} cm\nRMS Model: {:.2f} cm'.format(mean_Model, rms_Model), fontsize=8)
+plt.text(14, 4e4, 'Mean E.A.: {:.2f} cm\nRMS E.A.: {:.2f} cm:\n{}\nTotal EA events: {}:'.format(mean_EA, rms_EA, stats_text_EA, total_events_EA), fontsize=8)
+plt.text(14, 2e4, 'Mean Model: {:.2f} cm\nRMS Model: {:.2f} cm:\n{}\nTotal Model events: {}:'.format(mean_Model, rms_Model, stats_text_model, total_events_model), fontsize=8)
 plt.xlabel('(Reco - True) Vertex {} [cm]'.format(COORDINATE))
 plt.ylabel('Events')
 plt.text(-40, hist_EA_all_res.max() * 0.75, '{} {} {}\nAll Interactions\n {} coordinate'.format(
