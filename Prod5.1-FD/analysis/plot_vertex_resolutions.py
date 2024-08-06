@@ -442,6 +442,27 @@ hist_Model_all_res, bins_Model_all_res, patches_Model_all_res = plt.hist(
     alpha=0.5,
     label='Model Pred.')
 
+
+#Calculating the percentages of events within ranges of 10cm, 20cm and 30 cm for EA-True
+ranges=[10, 20, 30]
+total_events_EA = len(df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)])
+stats_text_EA = 'Total events: {} events\n'.format(total_events_EA)
+for r in ranges:
+    range_filter = (df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)])[((df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) >= -r) & ((df['vtxEA.{}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) <= r)]
+    percent_events = len(range_filter) / total_events_EA * 100
+    stats_text_EA += '±{} cm: {:.2f}% events\n'.format(r, percent_events)
+
+#Calculating the percentages and mean of events within some ranges for model
+
+ranges=[10, 20, 30]
+total_events_model = len(df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)])
+stats_text_model = 'Total model events: {} events\n'.format(total_events_model)
+for r in ranges:
+    range_filter = (df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)])[((df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) >= -r) & ((df['Model Pred {}'.format(COORDINATE)] - df['vtx.{}'.format(COORDINATE)]) <= r)]
+    percent_events = len(range_filter) / total_events_model * 100
+    stats_text_model += '±{} cm: {:.2f}% events\n'.format(r, percent_events)
+
+
 # plt.hist(np.clip(hist_Model_all_res, bins_Model_all_res[0], bins_Model_all_res[-1]), bins=bins_resolution, color='orange', alpha=0.5, label='Model Pred.')
 
 plt.text(14, 4e4, 'Mean E.A.: {:.2f} cm\nRMS E.A.: {:.2f} cm'.format(mean_EA, rms_EA), fontsize=8)
