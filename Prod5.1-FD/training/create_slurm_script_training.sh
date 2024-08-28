@@ -34,14 +34,14 @@ echo "Epochs: $EPOCHS"
 
 outputfile=training_${COORDINATE}_${DET}_${HORN}_${FLUX}_${EPOCHS}Epochs_${DATE}
 
-LOG_OUTDIR="/home/k948d562/output/logs/"
+LOG_OUTDIR="/homes/m962g264/wsu_Nova_Vertexer/output/new_logs/"
 
 TRAINING_FILE=${COORDINATE}_"vertex_training.py"
 
-slurm_dir="/home/k948d562/slurm-scripts/"
+slurm_dir="/homes/m962g264/wsu_Nova_Vertexer/Source/slurm_scripts_and_outputs/slurm-scripts-mike/"
 slurm_script="submit_slurm_${outputfile}.sh"
 
-cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOF
+cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOC
 #!/bin/bash
 
 # script automatically generated at ${DATE} by create_slurm_script_training.sh.
@@ -63,12 +63,13 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOF
 #SBATCH --nodes=1         # number of nodes. Adam says sbatch requires at least 2, but has never worked for me.
 #SBATCH --mem-per-cpu=20G # memory per CPU core
 #SBATCH --gres=gpu:2      # request 2 gpu # after discussion with Abdul & Mat
-
+#SBATCH --partition=wsu_gen_phys.q          #This is for priority on the physics gpu and can be used for more than 24 hours
 
 ###SBATCH --mail-type ALL
-###SBATCH --mail-user michael.dolce@wichita.edu
+###SBATCH --mail-user axyahaya@shockers.wichita.edu
 #======================================================================================================================================
 
+apptainer exec --nv /opt/beoshock/containers/beoshock_centos-7.9.sif /bin/bash -l <<EOF
 
 # load modules
 module load Python/3.7.4-GCCcore-8.3.0
@@ -76,12 +77,13 @@ module load TensorFlow/2.3.1-fosscuda-2019b-Python-3.7.4
 source /home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/activate
 /home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python --version
 
-echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/wsu-vertexer/training/${TRAINING_FILE} --detector $DET --horn $HORN --flux $FLUX --epochs $EPOCHS"
+echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /homes/m962g264/wsu_Nova_Vertexer/WSU-NOvA-Vertexer/Prod5.1-FD/training/${TRAINING_FILE} --detector $DET --horn $HORN --flux $FLUX --epochs $EPOCHS"
 #run python script
-/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/wsu-vertexer/training/${TRAINING_FILE} --detector $DET --horn $HORN --flux $FLUX --epochs $EPOCHS
-
+/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /homes/m962g264/wsu_Nova_Vertexer/WSU-NOvA-Vertexer/Prod5.1-FD/training/${TRAINING_FILE} --detector $DET --horn $HORN --flux $FLUX --epochs $EPOCHS
 
 EOF
+
+EOC
 
 echo "Created: $slurm_dir/$slurm_script "
 echo "logs will be written to: $LOG_OUTDIR"

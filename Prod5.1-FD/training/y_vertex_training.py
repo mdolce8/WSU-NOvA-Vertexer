@@ -33,7 +33,7 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras import metrics
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Dense, Conv2D, MaxPool2D, Flatten, Activation, concatenate
+from tensorflow.keras.layers import Dense, Conv2D, MaxPool2D, Flatten, Activation, concatenate, Dropout
 from tensorflow.keras.optimizers import Adam  # optimizer
 from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
 from tensorflow.python.client import device_lib
@@ -103,7 +103,7 @@ def logcosh(true, pred):
 parser = argparse.ArgumentParser()
 parser.add_argument("--detector", help="ND or FD", default="FD", type=str)
 parser.add_argument("--horn", help="FHC or RHC", default="FHC", type=str)
-parser.add_argument("--flux", help="nonswap (numu) or fluxswap (nue)", default="nonswap", type=str)
+parser.add_argument("--flux", help="combined(numu and nonswap),nonswap (numu) or fluxswap (nue)", default="nonswap", type=str)
 parser.add_argument("--epochs", help="number of epochs", default=20, type=int)
 args = parser.parse_args()
 
@@ -111,7 +111,7 @@ args = parser.parse_args()
 args.detector = args.detector.upper()
 args.horn = args.horn.upper()
 args.flux = args.flux.lower()
-args.flux = args.flux.capitalize()  # capitalize the first letter
+args.flux = args.flux.lower()  # capitalize the first letter
 print("ARGS TO SCRIPT: ", args.detector, args.horn, args.flux, args.epochs)
 
 # Using the pre-processed files.
@@ -395,20 +395,28 @@ model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
 model_regCNN_yz.add(Flatten())
 # add dense layers for each view. 256 neurons per layer
 model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dropout(0.5))
+
 # no. of classes (output)
 n_classes = 1
 # tf concatenate the models
-# model_regCNN = concatenate([model_regCNN_yz.output], axis=-1)
-# model_regCNN = Dense(n_classes)(model_regCNN)
+#model_regCNN = concatenate([model_regCNN_yz.output], axis=-1)
+model_regCNN_yz.add(Dense(n_classes))
 model_regCNN = Model(inputs=[model_regCNN_yz.input], outputs=model_regCNN_yz.output)
 # compile the concatenated model
+optimizer = Adam(learning_rate=1e-5, clipnorm=0.5)
 model_regCNN.compile(loss='logcosh',
-                     optimizer='adam',
+                     optimizer=optimizer,
                      metrics=['mse'])  # loss was 'mse' then 'mae'
 # print a summary of the model
 print(model_regCNN.summary())
@@ -424,7 +432,7 @@ print('Time to train: ', stop - start)
 # the default output name
 outputName = 'training_{}epochs_{}_{}_{}_Y_{}'.format(args.epochs, args.detector, args.horn, args.flux, date)
 
-save_model_dir = '/home/k948d562/output/trained-models/'
+save_model_dir = '/homes/m962g264/wsu_Nova_Vertexer/output/New-trained-model/model/'
 model_regCNN.save(save_model_dir + 'model_{}.h5'.format(outputName))
 print('saved model to: ', save_model_dir + 'model_{}.h5'.format(outputName))
 # Items in the model file: <KeysViewHDF5 ['model_weights', 'optimizer_weights']>
@@ -433,13 +441,13 @@ print('saved model to: ', save_model_dir + 'model_{}.h5'.format(outputName))
 metrics = pd.DataFrame(model_regCNN.history.history)
 print('METRICS:')
 print(metrics.head())
-save_metric_dir = '/home/k948d562/output/metrics/'
+save_metric_dir = '/homes/m962g264/wsu_Nova_Vertexer/output/metrics/'
 metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(outputName))
 print('saved metrics to: ', save_metric_dir + '/metrics_{}.csv'.format(outputName))
 
 
 # model evaluation with logcosh
-plot_dir = '/home/k948d562/plots/ml-vertexing-plots/wsu-vertexer/training/{}'.format(outputName)
+plot_dir = '/homes/m962g264/wsu_Nova_Vertexer/output/plots/New-trained-plots/{}'.format(outputName)
 
 if not os.path.isdir(plot_dir):
     os.makedirs(plot_dir)
