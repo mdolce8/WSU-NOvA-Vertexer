@@ -28,14 +28,15 @@ import argparse
 
 from datetime import date
 from sklearn import preprocessing
+from tensorflow.keras.initializers import HeNormal
 from tqdm import tqdm, tqdm_notebook
 from sklearn.model_selection import train_test_split
-from tensorflow.keras import metrics
+from tensorflow.keras import metrics, regularizers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Dense, Conv2D, MaxPool2D, Flatten, Activation, concatenate, Dropout
+from tensorflow.keras.layers import Dense, Conv2D, MaxPool2D, PReLU, Flatten, Activation, concatenate, Dropout, BatchNormalization, LeakyReLU
 from tensorflow.keras.optimizers import Adam  # optimizer
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
+from tensorflow.keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint, ReduceLROnPlateau, Callback
 from tensorflow.python.client import device_lib
 from sklearn.preprocessing import MinMaxScaler  # normalize and scale data
 from sklearn.metrics import mean_squared_error, mean_absolute_error, explained_variance_score, r2_score
@@ -177,6 +178,11 @@ print('cvnmap[0].shape: ', cvnmap[0].shape)
 print('vtx_y[0].shape: ', vtx_y[0].shape)
 print('firstcelly[0].shape: ', firstcelly[0].shape)
 
+print('first file vtx_y 20 entries are:', vtx_y[0][:20])
+print('Second file vtx_y 20 entries are:', vtx_y[1][:20])
+print('3rd file vtx_y 20 entries are:', vtx_y[2][:20])
+print('6th file vtx_y 20 entries are:', vtx_y[5][:20])
+
 # cvnmap = cvnmap.reshape(cvnmap)
 print('len of cvnmap is: ', len(cvnmap))
 
@@ -246,6 +252,16 @@ print('vtx_y_pixelmap[1] (these should NOT be 2e8 now) = ', vtx_y_pixelmap[1])
 print('firstcelly after conversion (these should NOT be 2e8 now): ', firstcelly[1])
 print('-------------------')
 
+print('vtx_y[2] = ', vtx_y[2][:20])
+print('vtx_y_pixelmap[2] (these should NOT be 2e8 now) = ', vtx_y_pixelmap[2][:20])
+print('firstcelly after conversion (these should NOT be 2e8 now): ', firstcelly[2][:20])
+
+print('========================================')
+print('vtx_y[3] = ', vtx_y[3][:20])
+print('vtx_y_pixelmap[3] (these should NOT be 2e8 now) = ', vtx_y_pixelmap[3][:20])
+print('firstcelly after conversion (these should NOT be 2e8 now): ', firstcelly[3][:20])
+
+print('========================================')
 
 # Print out useful info about the shapes of the arrays
 print('========================================')
@@ -260,6 +276,32 @@ print('vtx_y.shape: ', vtx_y.shape)
 print('vtx_y_pixelmap.shape: ', vtx_y_pixelmap.shape)
 print('firstcelly.shape: ', firstcelly.shape)
 print('-------------------')
+
+print('========================================')
+
+#Making a plot for the vtx_y_pixelmap plots 
+bins_resolution = np.arange(-200, 200, 10)
+fig_pixelmap= plt.figure(figsize=(10, 6))
+base_color = 'green'
+alpha_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]   
+vtx_y_pixelmap_files=[vtx_y_pixelmap[i] for i in range(8)]
+
+# Loop thru each vtx_y array and plot the histogram
+for i, (vtx_y_pixelmap_data, alpha) in enumerate(zip(vtx_y_pixelmap_files, alpha_values)):
+    negative_count = np.sum(vtx_y_pixelmap_data < 0) #negative pixelmaps count based on the file
+    print(f'File {i+1} has {negative_count} negative values.')
+
+    plt.hist(vtx_y_pixelmap_data, bins=bins_resolution, alpha=alpha, color=base_color, label=f'vtx_y_pixelmap_file_{i+1}')
+
+plt.xlabel('pixelmap')
+plt.ylabel('Count')
+plt.title('Histograms of vtx_y_pixelmap from 8 files')
+
+#Saving the vtx pixelmap plots 
+for ext in ['pdf', 'png']:
+    fig_pixelmap.savefig(
+        f'/homes/m962g264/wsu_Nova_Vertexer/output/plots/New-trained-plots/y_pixelmap_plot_{date}.{ext}', dpi=300, format=ext)
+
 
 # this array should be something like: (2, 10000, 16000)
 print('-------------------')
@@ -391,21 +433,25 @@ model_regCNN_yz.add(Conv2D(filters=32, kernel_size=(2, 2), strides=(1, 1),
 
 # specify 2-dimensional pooling
 model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
+
+#A change in filter to see if the model can learning more features and including initialization
+#model_regCNN_yz.add(Conv2D(filters=64, kernel_size=(2,2), strides=(1,1), kernel_initializer=HeNormal(), activation='relu'))
+#model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
+#model_regCNN_yz.add(Conv2D(filters=128, kernel_size=(2,2), strides=(1,1), kernel_initializer=HeNormal(), activation='relu'))
+#model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
+
 # flatten the datasets
 model_regCNN_yz.add(Flatten())
 # add dense layers for each view. 256 neurons per layer
 model_regCNN_yz.add(Dense(256, activation='relu'))
-#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
-#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
-#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
-#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
-#model_regCNN_yz.add(Dropout(0.5))
 model_regCNN_yz.add(Dense(256, activation='relu'))
-#model_regCNN_yz.add(Dropout(0.5))
+model_regCNN_yz.add(Dense(256, activation='relu'))
+
+
 
 # no. of classes (output)
 n_classes = 1
@@ -414,20 +460,65 @@ n_classes = 1
 model_regCNN_yz.add(Dense(n_classes))
 model_regCNN = Model(inputs=[model_regCNN_yz.input], outputs=model_regCNN_yz.output)
 # compile the concatenated model
-optimizer = Adam(learning_rate=1e-5, clipnorm=0.5)
+#optimizer = Adam(learning_rate=1e-5, clipnorm=0.5)
+
+#Implementing Data Augmentation
+#datagen = ImageDataGenerator(
+#    rotation_range=10,  # randomly rotate images in the range (degrees, 0 to 180)
+#    zoom_range=0.1,  # Randomly zoom image
+#    width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
+#    height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
+#    horizontal_flip=True,  # randomly flip images horizontally
+#    vertical_flip=False # Don't randomly flip images vertically
+#)  
+
+#Fitting the generator on the data
+#datagen.fit(x1_train)
+
+
+#compiling
+optimizer = Adam(learning_rate=0.0001, clipvalue=1.0) 
 model_regCNN.compile(loss='logcosh',
                      optimizer=optimizer,
-                     metrics=['mse'])  # loss was 'mse' then 'mae'
+                     metrics=['mse']
+)  # loss was 'mse' then 'mae'
 # print a summary of the model
 print(model_regCNN.summary())
 
 
+#Defining learning rate
+#reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6)
+
+#Checking the contribution of eavch layer in the architecture
+
+class ActivationMonitor(Callback):
+    def __init__(self, model, input_data):
+        self.model = model
+        self.input_data = input_data
+
+    def on_epoch_end(self, epoch, logs=None):
+        layer_outputs = [layer.output for layer in self.model.layers]  # Get outputs from all layers
+        activation_model = Model(inputs=self.model.input, outputs=layer_outputs) 
+        activations = activation_model.predict(self.input_data)
+
+        for i, activation in enumerate(activations):
+            if np.isnan(activation).any() or np.isinf(activation).any():
+                print(f"Epoch {epoch + 1}: NaN or Inf detected in Layer {i} ({self.model.layers[i].name})")
+            else:
+                # Calculate the percentage of zeros in the activations
+                zero_percentage = (activation.size - np.count_nonzero(activation)) / activation.size * 100
+                print(f"Epoch {epoch + 1}: Layer {i} ({self.model.layers[i].name}) - {zero_percentage:.2f}% zeros")
+
+# Initialize the callback with the model and input data
+activation_monitor = ActivationMonitor(model_regCNN, input_data)
+
 # x-coordinate system.
 date = date.today()
 start = time.time()
-model_regCNN.fit(x=[x1_train], y=y1_train, epochs=args.epochs, batch_size=32, verbose=1,)
+model_regCNN.fit(x=[x1_train], y=y1_train, epochs=args.epochs, batch_size=64, verbose=1, validation_data=(x1_test, y1_test), callbacks=[activation_monitor])
 stop = time.time()
 print('Time to train: ', stop - start)
+
 
 # the default output name
 outputName = 'training_{}epochs_{}_{}_{}_Y_{}'.format(args.epochs, args.detector, args.horn, args.flux, date)
