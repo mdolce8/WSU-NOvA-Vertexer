@@ -112,7 +112,7 @@ args = parser.parse_args()
 args.detector = args.detector.upper()
 args.horn = args.horn.upper()
 args.flux = args.flux.lower()
-args.flux = args.flux.lower()  # capitalize the first letter
+args.flux = args.flux.capitalize()  # capitalize the first letter
 print("ARGS TO SCRIPT: ", args.detector, args.horn, args.flux, args.epochs)
 
 # Using the pre-processed files.
@@ -263,6 +263,85 @@ print('firstcelly after conversion (these should NOT be 2e8 now): ', firstcelly[
 
 print('========================================')
 
+
+#trying to plot the pixelmaps values and the vertices 
+bins_resolution = np.arange(-200, 200, 10)
+alpha_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+base_colors = ['green', 'blue']
+vtx_y_pixelmap_files = [vtx_y_pixelmap[i] for i in range(8)]
+vtx_y_files = [vtx_y[i] for i in range(8)]
+
+def plot_histograms(data_files, base_color, title, filename_prefix, xlabel):
+    fig = plt.figure(figsize=(10, 6))
+    
+    for i, (data, alpha) in enumerate(zip(data_files, alpha_values)):
+        negative_count = np.sum(data < 0)
+        print(f'File {i+1} has {negative_count} negative values.')
+
+        plt.hist(data, bins=bins_resolution, alpha=alpha, color=base_color, label=f'File {i+1}')
+
+    
+    plt.xlabel(xlabel)
+    plt.ylabel('Count')
+    plt.title(title)
+    
+    # Save the plots
+    for ext in ['pdf', 'png']:
+        fig.savefig(f'/homes/m962g264/wsu_Nova_Vertexer/output/plots/New-trained-plots/{filename_prefix}_{date}.{ext}', dpi=300, format=ext)
+
+# Plot for vtx_y_pixelmap files (xlabel = 'Pixelmap')
+plot_histograms(vtx_y_pixelmap_files, base_colors[0], 'Histograms of vtx_y_pixelmap from 8 files', 'y_pixelmap_plot', 'Pixelmap')
+
+# Plot for vtx_y files (xlabel = 'Vertex')
+plot_histograms(vtx_y_files, base_colors[1], 'Histograms of vtx_y from 8 files', 'vtx_y_plot', 'Vertex')
+
+
+# Function to filter the pixelmap and corresponding vtx_y based on the pixelmap condition (20 < pixelmap < 50)
+def filter_pixelmap_and_vtx_y(pixelmap_data, vtx_y_data):
+    mask = (pixelmap_data > 20) & (pixelmap_data < 50) 
+    filtered_pixelmap = pixelmap_data[mask]            
+    filtered_vtx_y = vtx_y_data[mask]                  
+    return filtered_pixelmap, filtered_vtx_y, mask
+
+# Function to plot histogram 
+def plot_histograms(data_files, base_color, title, filename_prefix, xlabel):
+    fig = plt.figure(figsize=(10, 6))
+    
+    # Loop through each data file and plot the histogram
+    for i, (data, alpha) in enumerate(zip(data_files, alpha_values)):
+        negative_count = np.sum(data < 0)
+        print(f'File {i+1} has {negative_count} negative values.')
+
+        # Plot the histogram with step-like style, using count instead of density
+        plt.hist(data, bins=bins_resolution, alpha=alpha, color=base_color, histtype='step', label=f'File {i+1}')
+
+    # Set labels and title
+    plt.xlabel(xlabel)
+    plt.ylabel('Count')  # Change y-axis label to 'Count'
+    plt.title(title)
+    
+    # Save the plots in both PDF and PNG formats
+    for ext in ['pdf', 'png']:
+        fig.savefig(f'/homes/m962g264/wsu_Nova_Vertexer/output/plots/New-trained-plots/{filename_prefix}_{date}.{ext}', dpi=300, format=ext)
+
+# Filter and plot for vtx_y_pixelmap files and corresponding vtx_y files
+
+for vtx_y_pixelmap_data, vtx_y_data in zip(vtx_y_pixelmap_files, vtx_y_files):
+    # Apply filtering: select pixelmaps between 20 and 50 and their corresponding vtx_y values
+    filtered_pixelmap, filtered_vtx_y, mask = filter_pixelmap_and_vtx_y(vtx_y_pixelmap_data, vtx_y_data)
+    
+
+# Plot for filtered vtx_y_pixelmap files (xlabel = 'Pixelmap')
+plot_histograms([filtered_pixelmap], base_colors[0], 'Histograms of filtered vtx_y_pixelmap from 8 files', 'filtered_y_pixelmap_plot', 'Pixelmap')
+
+# Plot for filtered vtx_y files (xlabel = 'Vertex')
+plot_histograms([filtered_vtx_y], base_colors[1], 'Histograms of filtered vtx_y from 8 files', 'filtered_vtx_y_plot', 'Vertex')
+
+plt.show()
+
+
+print('========================================')
+
 # Print out useful info about the shapes of the arrays
 print('========================================')
 print('Useful info about the shapes of the arrays:')
@@ -272,36 +351,10 @@ print('the pixel_idx is for cvnmaps only')
 print('-------------------')
 # we set file_idx manually
 print('cvnmap.shape: ', cvnmap.shape)
-print('vtx_y.shape: ', vtx_y.shape)
-print('vtx_y_pixelmap.shape: ', vtx_y_pixelmap.shape)
+print('vtx_y.shape: ', filtered_vtx_y.shape)
+print('vtx_y_pixelmap.shape: ', filtered_pixelmap.shape)
 print('firstcelly.shape: ', firstcelly.shape)
 print('-------------------')
-
-print('========================================')
-
-#Making a plot for the vtx_y_pixelmap plots 
-bins_resolution = np.arange(-200, 200, 10)
-fig_pixelmap= plt.figure(figsize=(10, 6))
-base_color = 'green'
-alpha_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]   
-vtx_y_pixelmap_files=[vtx_y_pixelmap[i] for i in range(8)]
-
-# Loop thru each vtx_y array and plot the histogram
-for i, (vtx_y_pixelmap_data, alpha) in enumerate(zip(vtx_y_pixelmap_files, alpha_values)):
-    negative_count = np.sum(vtx_y_pixelmap_data < 0) #negative pixelmaps count based on the file
-    print(f'File {i+1} has {negative_count} negative values.')
-
-    plt.hist(vtx_y_pixelmap_data, bins=bins_resolution, alpha=alpha, color=base_color, label=f'vtx_y_pixelmap_file_{i+1}')
-
-plt.xlabel('pixelmap')
-plt.ylabel('Count')
-plt.title('Histograms of vtx_y_pixelmap from 8 files')
-
-#Saving the vtx pixelmap plots 
-for ext in ['pdf', 'png']:
-    fig_pixelmap.savefig(
-        f'/homes/m962g264/wsu_Nova_Vertexer/output/plots/New-trained-plots/y_pixelmap_plot_{date}.{ext}', dpi=300, format=ext)
-
 
 # this array should be something like: (2, 10000, 16000)
 print('-------------------')
@@ -321,22 +374,33 @@ y_temp, vtx_y_pixelmap_resh = [], []
 # NOTE: we are creating a list initially.
 total_event_counter = 0
 file_count = 0
-for file_count in range(len(os.listdir(train_path))):
-    print('Processing train cvnmap file {} of {}'.format(file_count + 1, (len(os.listdir(train_path)))))
+#for file_count in range(len(os.listdir(train_path))):
+for file_count in range(len(vtx_y_pixelmap_files)):
+    # Apply filtering: select pixelmaps between 20 and 50 and their corresponding vtx_y values
+    filtered_pixelmap, filtered_vtx_y, mask = filter_pixelmap_and_vtx_y(vtx_y_pixelmap_files[file_count], vtx_y_files[file_count])
+
+   # print('Processing train cvnmap file {} of {}'.format(file_count + 1, (len(os.listdir(train_path)))))
+    print('Processing train cvnmap file {} of {}'.format(file_count + 1, (len(vtx_y_pixelmap_files))))
 
     # loop through events in each file...in this current array structure, this is: cvnmap[file_count].shape[1].
     # I.e. the second index within the file_idx.
     print('beginning loop over N events....', cvnmap[file_count].shape[0])
     print('About to reshape N ({}) events into (100, 80) map size...'.format(cvnmap[file_count].shape[0]))
     assert cvnmap[file_count].shape[1] == 100*80*2, 'must have 16000 pixels to reshape the maps!'
+
+    event_count = 0
     for ev in range(cvnmap[file_count].shape[0]):
+
+        if not mask[ev]:
+            continue
 
         b = cvnmap[file_count][ev].reshape(2, 100, 80)
         cvnmap_resh_yz.append(b[1])  # b[0] is the XZ view, b[1] is the YZ view. --> We want the YZ view here. 
-
-        y_temp = vtx_y_pixelmap[file_count][ev]
+        y_temp = filtered_pixelmap[file_count]
+       # y_temp = vtx_y_pixelmap[file_count][ev]
         vtx_y_pixelmap_resh.append(y_temp)
-
+        
+        event_count += 1
 
     print('ev at then end of loop: ', ev)
     total_event_counter += ev
@@ -435,21 +499,21 @@ model_regCNN_yz.add(Conv2D(filters=32, kernel_size=(2, 2), strides=(1, 1),
 model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
 
 #A change in filter to see if the model can learning more features and including initialization
-#model_regCNN_yz.add(Conv2D(filters=64, kernel_size=(2,2), strides=(1,1), kernel_initializer=HeNormal(), activation='relu'))
-#model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
-#model_regCNN_yz.add(Conv2D(filters=128, kernel_size=(2,2), strides=(1,1), kernel_initializer=HeNormal(), activation='relu'))
-#model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
+model_regCNN_yz.add(Conv2D(filters=64, kernel_size=(2,2), strides=(1,1), kernel_initializer=HeNormal(), activation='relu'))
+model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
+model_regCNN_yz.add(Conv2D(filters=128, kernel_size=(2,2), strides=(1,1), kernel_initializer=HeNormal(), activation='relu'))
+model_regCNN_yz.add(MaxPool2D(pool_size=(2, 2)))
 
 # flatten the datasets
 model_regCNN_yz.add(Flatten())
 # add dense layers for each view. 256 neurons per layer
 model_regCNN_yz.add(Dense(256, activation='relu'))
 model_regCNN_yz.add(Dense(256, activation='relu'))
-model_regCNN_yz.add(Dense(256, activation='relu'))
-model_regCNN_yz.add(Dense(256, activation='relu'))
-model_regCNN_yz.add(Dense(256, activation='relu'))
-model_regCNN_yz.add(Dense(256, activation='relu'))
-model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dense(256, activation='relu'))
+#model_regCNN_yz.add(Dense(256, activation='relu'))
 
 
 
@@ -477,9 +541,9 @@ model_regCNN = Model(inputs=[model_regCNN_yz.input], outputs=model_regCNN_yz.out
 
 
 #compiling
-optimizer = Adam(learning_rate=0.0001, clipvalue=1.0) 
+#optimizer = Adam(learning_rate=0.0001, clipvalue=1.0) 
 model_regCNN.compile(loss='logcosh',
-                     optimizer=optimizer,
+                     optimizer='adam',
                      metrics=['mse']
 )  # loss was 'mse' then 'mae'
 # print a summary of the model
@@ -491,31 +555,31 @@ print(model_regCNN.summary())
 
 #Checking the contribution of eavch layer in the architecture
 
-class ActivationMonitor(Callback):
-    def __init__(self, model, input_data):
-        self.model = model
-        self.input_data = input_data
+#class ActivationMonitor(Callback):
+#    def __init__(self, model, input_data):
+#        self.model = model
+#        self.input_data = input_data
 
-    def on_epoch_end(self, epoch, logs=None):
-        layer_outputs = [layer.output for layer in self.model.layers]  # Get outputs from all layers
-        activation_model = Model(inputs=self.model.input, outputs=layer_outputs) 
-        activations = activation_model.predict(self.input_data)
+#    def on_epoch_end(self, epoch, logs=None):
+#        layer_outputs = [layer.output for layer in self.model.layers]  # Get outputs from all layers
+#        activation_model = Model(inputs=self.model.input, outputs=layer_outputs) 
+#        activations = activation_model.predict(self.input_data)
 
-        for i, activation in enumerate(activations):
-            if np.isnan(activation).any() or np.isinf(activation).any():
-                print(f"Epoch {epoch + 1}: NaN or Inf detected in Layer {i} ({self.model.layers[i].name})")
-            else:
+#        for i, activation in enumerate(activations):
+#            if np.isnan(activation).any() or np.isinf(activation).any():
+#                print(f"Epoch {epoch + 1}: NaN or Inf detected in Layer {i} ({self.model.layers[i].name})")
+#            else:
                 # Calculate the percentage of zeros in the activations
-                zero_percentage = (activation.size - np.count_nonzero(activation)) / activation.size * 100
-                print(f"Epoch {epoch + 1}: Layer {i} ({self.model.layers[i].name}) - {zero_percentage:.2f}% zeros")
+#                zero_percentage = (activation.size - np.count_nonzero(activation)) / activation.size * 100
+#                print(f"Epoch {epoch + 1}: Layer {i} ({self.model.layers[i].name}) - {zero_percentage:.2f}% zeros")
 
 # Initialize the callback with the model and input data
-activation_monitor = ActivationMonitor(model_regCNN, input_data)
+#activation_monitor = ActivationMonitor(model_regCNN, x1_train)
 
 # x-coordinate system.
 date = date.today()
 start = time.time()
-model_regCNN.fit(x=[x1_train], y=y1_train, epochs=args.epochs, batch_size=64, verbose=1, validation_data=(x1_test, y1_test), callbacks=[activation_monitor])
+model_regCNN.fit(x=[x1_train], y=y1_train, epochs=args.epochs, batch_size=64, verbose=1, validation_data=(x1_test, y1_test))
 stop = time.time()
 print('Time to train: ', stop - start)
 
