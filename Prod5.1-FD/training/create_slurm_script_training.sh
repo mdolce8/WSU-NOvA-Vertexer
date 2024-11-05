@@ -15,33 +15,44 @@ DATE=$(date +%m-%d-%Y.%H.%M.%S)
 echo "current date: " $DATE
 
 
-COORDINATE=$1 # x, y, or z
+COORDINATE=$1 # x, y, z, or xyz
 DET=$2        # ND or FD
 HORN=$3       # FHC or RHC
-FLUX=$4       # Nonswap, Fluxswap
+FLUX=$4       # Nonswap, Fluxswap, combined (both numu+nue)
 EPOCHS=$5     # number of epochs to train for
 
-echo "Coordinate: $COORDINATE"
-echo "Detector: $DET"
-echo "Horn: $HORN"
-echo "Flux: $FLUX"
-echo "Epochs: $EPOCHS"
+echo "Coordinate: ${COORDINATE}"
+echo "Detector: ${DET}"
+echo "Horn: ${HORN}"
+echo "Flux: ${FLUX}"
+echo "Epochs: ${EPOCHS}"
 
 
 # Some documentation (from latest sbatch jobs):
+# -- Fluxswap:
 # z coordinate takes: 16 tasks, 1 node, 20 GB mem-per-cpu.
 # x coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
+# y coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
+
+# -- Nonswap:
+# x coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
+# y coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
+# z coordinate...... ?
+
+# TODO: investigate Physics GPU more...(can it be used together with high_mem...?)
 
 outputfile=training_${COORDINATE}_${DET}_${HORN}_${FLUX}_${EPOCHS}Epochs_${DATE}
 
 LOG_OUTDIR="/home/k948d562/output/logs/"
 
-TRAINING_FILE=${COORDINATE}_"vertex_training.py"
+TRAINING_SCRIPT=${COORDINATE}_"vertex_training.py"
+
+DATA_TRAIN_PATH="/home/k948d562/output/training/${DET}-Nominal-${HORN}-${FLUX}/"
 
 slurm_dir="/home/k948d562/slurm-scripts/"
 slurm_script="submit_slurm_${outputfile}.sh"
 
-cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOF
+cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 #!/bin/bash
 
 # script automatically generated at ${DATE} by create_slurm_script_training.sh.
@@ -64,11 +75,15 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOF
 #SBATCH --mem-per-cpu=20G # memory per CPU core
 #SBATCH --gres=gpu:2      # request 2 gpu # after discussion with Abdul & Mat
 
+#SBATCH --partition=wsu_gen_phys.q  # Physics own GPU. unclear how it works with 'highmem'
+###SBATCH --partition=wsu_gen_highmem.q
 
 ###SBATCH --mail-type ALL
 ###SBATCH --mail-user michael.dolce@wichita.edu
 #======================================================================================================================================
 
+# create the apptainer
+apptainer exec --nv /opt/beoshock/containers/beoshock_centos-7.9.sif /bin/bash -l <<EOF
 
 # load modules
 module load Python/3.7.4-GCCcore-8.3.0
@@ -76,12 +91,17 @@ module load TensorFlow/2.3.1-fosscuda-2019b-Python-3.7.4
 source /home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/activate
 /home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python --version
 
-echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/wsu-vertexer/training/${TRAINING_FILE} --detector $DET --horn $HORN --flux $FLUX --epochs $EPOCHS"
-#run python script
-/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/wsu-vertexer/training/${TRAINING_FILE} --detector $DET --horn $HORN --flux $FLUX --epochs $EPOCHS
+echo "INFO: appending MLVTX to PYTHONPATH"
+export PYTHONPATH="\\\$PYTHONPATH:/homes/k948d562/ml-vertexing"
+echo "PYTHONPATH is ... \\\$PYTHONPATH"
 
+echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/single-model/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
+#run python script
+/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/single-model/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
 
 EOF
+
+EOS
 
 echo "Created: $slurm_dir/$slurm_script "
 echo "logs will be written to: $LOG_OUTDIR"
