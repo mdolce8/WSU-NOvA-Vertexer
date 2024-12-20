@@ -1,3 +1,10 @@
-+ v00.01
++ v1.1.0
+  - correct the slurm directives for --nodelist and --mem --> use only gpu201901, yields successful training.
+  - many new functions for debugging and cleaning data, eg dropping 'bad' vertex events.
+  - many plots added for analysis of trained model.
++ v1.0.0
+  - substantial revision to model: learn all three coordinates simultaneously.
+  - create a utils/ dir for oft-used code & functions.
++ v0.0.1
   - version from APS 2024 presentation.
   - predicts single coordinate at a time.
