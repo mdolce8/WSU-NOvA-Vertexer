@@ -4,7 +4,8 @@
 # testing of the joint XYZ training together.
 
 # To run this training script:
-#  $ $PY37 xyz_vertex_training_testsize.py --data_train_path --epochs <200>
+#  $ $PY37 xyz_vertex_training_testsize.py --data_train_path --epochs <20>
+# generally: $OUTPUT/training/FD-Nominal-FHC-Fluxswap-testsize/
 
 # ML Vtx utils
 import utils.iomanager as io
@@ -15,6 +16,7 @@ import utils.data_processing as dp
 import argparse
 from datetime import date
 import numpy as np
+import os
 import pandas as pd
 from tensorflow.keras.optimizers import Adam  # optimizer
 from sklearn.metrics import mean_squared_error, mean_absolute_error, explained_variance_score, r2_score
@@ -30,7 +32,7 @@ args = parser.parse_args()
 
 # want the final dir, and extract its strings.
 train_path = args.data_train_path
-train_path_dir = train_path.split('/')[-1]
+train_path_dir = os.path.basename(os.path.normpath(train_path))
 det, horn, flux = io.IOManager.get_det_horn_and_flux_from_string(train_path_dir)
 
 print('WARNING: You are doing testing, be sure you have the correct path to train data! ')
@@ -60,7 +62,6 @@ for i in [datasets['firstcellx'], datasets['firstcelly']]:
     if i[file_idx][event] > 4294967200:  # this a large number, just below the max value of an unsigned int, which should trigger
         print('i: ', i)
     event += 1
-
 
 print('========================================')
 print('Converting the vertex coordinates into pixelmap coordinates for the network...')
@@ -98,24 +99,36 @@ print('========================================')
 # reshape the pixels into 2 (100,80) views: XZ and YZ.
 print('reshape the pixels into 2 (100,80) views: XZ and YZ.....')
 
-# NOTE: this still only works if the events are the same for each file...
-cmap = cvnmap.reshape(total_events, 16000)
-print(cmap.shape)
-cmap = cmap.reshape(total_events, 100, 80, 2)  # divide into the pixels into the map
-cmap = cmap.reshape(cmap.shape[0], cmap.shape[1], cmap.shape[2], cmap.shape[3], 1) # add the color channel
-cvnmap_xz = cmap[:, :, :, 0].reshape(cmap.shape[0], 100, 80, 1)  # Extract the XZ view and reshape
-cvnmap_yz = cmap[:, :, :, 1].reshape(cmap.shape[0], 100, 80, 1)  # Extract the YZ view and reshape
-print('XZ: ', cvnmap_xz.shape)
-print('YZ: ', cvnmap_yz.shape)
 
-# TODO: this is prob how we want to do it for the 8 files (of diff. events)
-# maps = []
-# for file in range(len(cvnmap[0].shape)):
-#     print('file: ', file)
-#     cnvmap_per_file = cvnmap[file]
-#     print('cnvmap_per_file: ', cnvmap_per_file.shape)
-#     maps = cnvmap_per_file.reshape(file, 100, 80, 2)
-#     cvnmap += cnvmap_per_file
+cvnmap_xz = []
+cvnmap_yz = []
+total_event_counter = 0
+file_counter = 0
+
+train_files = int(cvnmap.shape[0])
+
+for file_counter, h5_filename in enumerate(range(train_files)):
+    print(f"Processing train cvnmap file {file_counter + 1} of {train_files}")
+
+    print(f"Reshaping all {cvnmap.shape[1]} events into correct pixel map size (100, 80)")
+    for event in range(cvnmap.shape[1]):
+        reshaped_maps = cvnmap[file_counter][event].reshape(2, 100, 80)
+        cvnmap_xz.append(reshaped_maps[0])
+        cvnmap_yz.append(reshaped_maps[1])
+
+        total_event_counter += 1
+
+    # might work for the (4,) index
+    # reshaped_maps = cvnmap[file_counter].reshape(-1, 2, 100, 80)  # Reshape all events at once
+    # Split into XZ and YZ views
+    # cvnmap_xz = np.concatenate([cvnmap_xz, reshaped_maps[:, 0]], axis=0)  #add to the end of the array
+    # cvnmap_yz = np.concatenate([cvnmap_yz, reshaped_maps[:, 1]], axis=0)
+cvnmap_xz = np.array(cvnmap_xz)
+cvnmap_yz = np.array(cvnmap_yz)
+
+# Validate results
+assert train_files == (file_counter + 1), f"File count mismatch: {file_counter + 1} files processed."
+assert cvnmap.shape[1] * cvnmap.shape[0] == total_event_counter, f"Event count mismatch: {total_event_counter} != {cvnmap.shape[1] * cvnmap.shape[0]}."
 
 print('========================================')
 # must re-shape the vtx_x_pixelmap array to match the cvnmap_resh_xz array
@@ -127,12 +140,24 @@ vtx_y_pixelmap = vtx_y_pixelmap.reshape(total_events)
 vtx_z_pixelmap = vtx_z_pixelmap.reshape(total_events)
 print('After, vtx_x_pixelmap: ', vtx_x_pixelmap.shape)
 
+# combine for Nx3 array: [X, Y, Z]
 vtx_coords = np.stack((vtx_x_pixelmap, vtx_y_pixelmap, vtx_z_pixelmap), axis=-1)
-print('vtx_coords: ', vtx_coords.shape)
+
+# Drop the events that are outside the cvnmap!
+# Apply to both features & labels.
+# dictionary of {keep; np.array, drop: array}
+keep_drop_evts = dp.DataCleaning.sort_events_with_vtxs_outside_cvnmaps(vtx_coords)
+vtx_coords = vtx_coords[keep_drop_evts['keep']]
+cvnmap_xz = cvnmap_xz[keep_drop_evts['keep']]
+cvnmap_yz = cvnmap_yz[keep_drop_evts['keep']]
+assert cvnmap_xz.shape[0] == cvnmap_yz.shape[0] == vtx_coords.shape[0]
+
+# reduce the memory size. Two decimal places is sufficient.
+vtx_coords = vtx_coords.astype(np.float16)
+
 
 # #### Prepare the Training & Test Sets
 # split the data into training (+ val) and testing sets
-
 # XZ view and YZ view. Train on both views; predict all 3 coordinates.
 # Train -- for fit(). Val -- for fit(). Test -- for evaluate()
 data_train, data_val, data_test = utils.model.Config.create_test_train_val_datasets(cvnmap_xz, cvnmap_yz, vtx_coords)
@@ -144,19 +169,12 @@ data_train, data_val, data_test = utils.model.Config.create_test_train_val_datas
 print('========================================')
 utils.model.Hardware.check_gpu_status()
 print('========================================')
-print('Final printout of shape before feeding into network......')
-print('training: (after final reshaping)')
-print("data_train['xz'].shape: ", data_train['xz'].shape)
-print("data_train['yz'].shape: ", data_train['yz'].shape)
-print('testing:')
-print("test_train['xz'].shape: ", data_test['xz'].shape)
-print("data_test['xz'].shape: ", data_test['xz'].shape)
+dp.print_input_data(data_train, data_test, data_val)
 print('========================================')
 
 # ### MultiView Fully Connected Layer Regression CNN Model
 
-print('using only XZ model for `x`, `y`, and `z` coordinates......')
-# define separate models for each view
+print('using XZ and YZ views (two models) for `x`, `y`, and `z` coordinates......')
 model_xz = utils.model.Config.create_conv2d_branch_model_single_view()
 model_yz = utils.model.Config.create_conv2d_branch_model_single_view()
 
@@ -164,31 +182,21 @@ model_yz = utils.model.Config.create_conv2d_branch_model_single_view()
 model_regCNN = utils.model.Config.assemble_model_output(model_xz, model_yz)
 
 # compile the concatenated model
-model_regCNN.compile(loss='logcosh',
-                     optimizer='adam',
-                     metrics=['mse'])  # loss was 'mse' then 'mae'
+utils.model.Config.compile_model(model_regCNN)
 # print a summary of the model
 print(model_regCNN.summary())
 
-
-# xyz-coordinate system.
-date = date.today()
-start = time.time()
-history = model_regCNN.fit(
-    x={'data_train_xz': data_train['xz'], 'data_train_yz': data_train['yz']},
-    y=data_train['vtx'],
-    epochs=args.epochs,
-    batch_size=32,
-    verbose=1,
-    validation_data=({'data_val_xz': data_val['xz'], 'data_val_yz': data_val['yz']}, data_val['vtx']))
-stop = time.time()
-print('Time to train: ', stop - start)
+history = utils.model.train_model(model_regCNN,
+                                  data_train,
+                                  data_val,
+                                  args.epochs,
+                                  32)
 
 # save the history to a pandas dataframe, will append the evaluate() output to this dataframe
 metrics = pd.DataFrame(history.history)
 
 # the default output name
-output_name = 'testsize_{}epochs_{}_{}_{}_{}_XYZ'.format(args.epochs, det, horn, flux, date)
+output_name = 'testsize_{}epochs_{}_{}_{}_{}_XYZ'.format(args.epochs, det, horn, flux, date.today())
 
 # save the model
 save_model_dir = '/home/k948d562/output/trained-models/'
@@ -196,31 +204,19 @@ model_regCNN.save(save_model_dir + 'model_{}.h5'.format(output_name))
 print('saved model to: ', save_model_dir + 'model_{}.h5'.format(output_name))
 # Items in the model file: <KeysViewHDF5 ['model_weights', 'optimizer_weights']>
 
+# outdir for testsize is different.
+save_metric_dir = f'/home/k948d562/output/metrics/small-scale-testing/{output_name}'
 
 # Evaluate the test set
-start_eval = time.time()
-print('Evaluation on the test set...')
-evaluation = model_regCNN.evaluate(
-    x={'data_test_xz': data_test['xz'], 'data_test_yz':data_test['xz']},
-    y=data_test['vtx'],
-    verbose=1)
-stop_eval = time.time()
-print('Test Set Evaluation: {}'.format(evaluation))
-print('Evaluation time: ', stop_eval - start_eval)
-
-
 print('METRICS:')
+evaluation = utils.model.evaluate_model(model_regCNN,
+                                        data_test,
+                                        keep_drop_evts,
+                                        save_metric_dir)
 print(metrics.head())
-save_metric_dir = '/home/k948d562/output/metrics/'
 metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(output_name), index_label='epoch')
-print('writing evaluation() to txt file...')
 print('saved metrics to: ', save_metric_dir + '/metrics_{}.csv'.format(output_name))
 # NOTE: evaluation only returns ONE number for each metric , and one for the loss, so just write to txt file.
-with open(f'{save_metric_dir}/evaluation_results.txt', 'w') as f:
-    f.write(f"Test Loss: {evaluation[0]}\n")
-    f.write(f"Test MSE: {evaluation[1]}\n")
-print('save evaluation to: ', save_metric_dir + '/evaluation_results.txt')
-
 
 plot_dir = '/home/k948d562/plots/ml-vertexing-plots/small-scale-testing/'
 utils.plot.plot_training_metrics(history, plot_dir, 'train_metrics_' + output_name)
