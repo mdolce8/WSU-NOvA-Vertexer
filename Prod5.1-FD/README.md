@@ -3,9 +3,9 @@
 
 --- 
 
-_Original Author_: Michael Dolce mdolce@fnal.gov
+_Original Author_: Michael Dolce -- mdolce@fnal.gov
 
-Updated: Nov. 2023
+Updated: **Dec. 2024**
 
 --- 
 
@@ -22,6 +22,9 @@ The paths in the scripts are set to my WSUID.
 You **MUST** change these paths to your WSUID or else you will not be able to run the scripts.
 Check where they are by doing:
 ```grep -i "k948d562" * -r```.
+
+**Second NOTE:**
+Much of the frequently-used code has been moved to `utils`.
 
 ## 0. Pre-processing
 As it stands, the code is set up to run on the WSU cluster.
@@ -104,32 +107,35 @@ Here is an example:
 
 ## 2. Training
 
-Next we produce training models for each coordinate.
+Next we train a model for **all coordinates simultaneously**.
+We have come to call this the "branch model", others in NOvA have called it the "Siamese" model.
+
 Again, we perform the training on the WSU cluster using slurm.
 We use `training/create_slurm_script_training.sh` to create the slurm script for training.
 Its arguments are:
 ```
-COORDINATE=$1 # x, y, or z
+COORDINATE=$1 # xyz
 DET=$2        # ND or FD
 HORN=$3       # FHC or RHC
 FLUX=$4       # Nonswap, Fluxswap
+EPOCHS=$5     # number of epochs
 ```
  which are identical arguments to the pre-processing script. We run the script like this: 
 
-``` . create_slurm_script_training.sh <coordinate> <det> <horn> <flux>```
+``` . create_slurm_script_training.sh <coordinates> <det> <horn> <flux> <epochs>```
 
 Before running, we must address the file path: 
 * **the user must manually copy the `preprocessed_*.h5` files to the `training` directory.**
 For example for the FD FHC Fluxswap sample, the preprocessed files must be copied here,
 ```/home/{WSUID}/output/wsu-vertexer/training/FD-Nominal-FHC-Fluxswap/```
 as this is path that the training script will look for the files.
-(Note the user will need to change the path to their WSUID).
+(Note the user will need to change the path to **their** WSUID).
 
 Once this is addressed, we can submit the slurm script that is created from the bash script:
 
-```sbatch submit_slurm_training_${COORDINATE}_${DET}_${HORN}_${FLUX}_${DATE}.sh```
+```sbatch submit_slurm_training_${EPOCHS}_${DET}_${HORN}_${FLUX}_${COORDINATE}_${DATE}.sh```
 
-For those curious, what is _really_ running is `x_vertex_training.py` (for the x coordinate, for example),
+For those curious, what is _really_ running is `xyz_vertex_training.py` ,
 where the arguments from the bash script are used into the training script.
 This script does many important things:
 * loads the pre-processed h5 files,
@@ -140,29 +146,53 @@ This script does many important things:
 * saves the metrics (the history) to a CSV file.
 
 ---
-**Details about training**: there are separate training scripts for each coordinate, so the user must run each one individually.
-The reason is due to subtle differences with the information that is needed/used for training each coordinate.
-Namely, when training the `x` and `y` coordinates, only one of two planes will be of use, the **XZ** or **YZ** plane, respectively.
-Thus, we do not need to give the model excess information of the other plane
-**However**, the `z` plane is different. We can benefit from both planes, so we need to give the model both planes. 
-This is the primary reason we have separate training scripts for each coordinate.
 
-Despite these differences in _how_ the model is constructed for training, these changes are transparent to the user;
-they all should be submitted to the WSU cluster in the same way via the slurm script created from `create_slurm_script_training.sh`.
+### Details about training: 
+
+We produce three outputs: X, Y, and Z. The model uses both pixel map images
+to "learn" about the vertex location for each coordinate. 
+In principle, it we are maximizing the information of each coordinate by giving the model the two views for every event.
+
+**`slurm` directives**:
+Because we are using significantly more memory loading **both** sets of pixel map images for training,
+we use a sizable amount of memory. Fortunately our requests (as of now) fit within a single node.
+From a recent job, `sacct` reports:
+
+```
+sacct -j 916110 --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList 
+JobID           JobName     MaxRSS  MaxVMSize        NodeList 
+------------ ---------- ---------- ---------- --------------- 
+916110       xyz_FD_FH+                             gpu201901 
+916110.batch      batch 342366260K          0       gpu201901 
+916110.exte+     extern       256K          0       gpu201901 
+```
+
+* 340 GB of memory usage
+* For the current version of TensorFlow & Python (2.3.1 and 3.7), user **must** request
+`--nodelist=gpu201901` otherwise model will return garbage on the newer, 2024 Physics GPUs
+(this is already done inside the `create_slurm` bash script).
+
 
 ---
 
 To check on the status of the job, we can do: ```squeue -u $USER``` or `kstat` to see the status of the job.
-Note, that there are `.log` and `.err` files that get made (with the same name as the sbatch script) that can be used to debug the job too (very helpful).
-The job _should_ take about 24 (likely more) hours to complete. 
+Note, that there are `.log` and `.err` files that get made (check the bash script for the exact name) that can be used to debug the job too (very helpful).
+The job _should_ take about 4 hours to complete, using the current configuration. 
 
 Once completed, the `.log` file contains useful printout information about the network, loss, and time to train, in addition,
 to the names and directories of the saved models, and metrics file.
 So, it is important to keep track of the `.log` file for this info.
 
-** We note that we use a "small scale" python script to train a small subset of the train data to ensure the
-plumbing is working properly. This can also be helpful for debugging. 
-This script is `x_vertex_training_testsize.py`.** 
+In addition, once the job completes, it is **highly beneficial** the user use `sacct -j <jobnumber>` to note important metrics from the job, such as:
+memory usage, total time, CPUs used, and more. 
+```
+sacct -j $SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList 
+```
+For more information to report do `sacct --help` to get a list of other quantities to report.
+
+** NOTE: We note that we use a "small scale" python script to train a small subset of the train data to ensure the
+plumbing is working properly. This can also be helpful for debugging. It is NOT for production use, but for testing infrastructure.
+This script is `xyz_vertex_training_testsize.py`.** 
 
 
 --- 
@@ -173,28 +203,24 @@ Next, we want to use the model file to make predictions on the designated infere
 
 NOTE: 
 * the inference data set is different from the training data set.
-* In the FD Prod5.1 {FHC,RHC} {nonswap,fluxswap} samples, the inference data set is file 24 and/or 27.
+* In the FD Prod5.1 {FHC,RHC} {nonswap,fluxswap} samples, the inference data set is file 27.
 
-We run the prediction with, 
+Here is an example of generating the prediction on the designated "file 27" (this script automatically should read in file 27):
 
-``` python model-prediction/model_predict_coordinate.py --detector FD --horn FHC --flux Fluxswap--model_file <model_file>```
+```
+$PY37 model_predict_coordinates_xyz.py \
+--model_file $OUTPUT/trained-models/model_29epochs_FD_FHC_Fluxswap_2024-12-18_XYZ.h5 \
+--outdir $OUTPUT/predictions 
+```
 
-where `detector` is "FD" for Far Detector, `horn` is the magnetic horn current `FHC` or `RHC`
-(for "Forward Horn Current" and "Reverse Horn Current"), `flux` is either `nonswap` or `fluxswap` (for muon neutrinos or electron neutrinos, respectively),
-and `--model_file` is the full path to the h5 file produced from the training.
-
+where `--model_file` is the full path to the h5 file produced from the training.
 This will generate a prediction of the coordinate that's name is included in the `model_file` name.
+This takes about 5 minutes to run.
 
----
-IMPORTANT NOTE: the model for the X and Y coordinates produces 256 predictions for a single vertex,
-which is not exactly what we want. Instead, we want just one prediction for each vertex, so at the moment, this
-code takes the mean of the 256 predictions.
-(We have been looking into how we can reduce the number of predictions to just one, without reducing performance.)
-This will be addressed in a future PR.
 ---
 
 These predictions will be saved as a CSV file that contain the following information:
-```['True X', 'Reco X', 'Model Prediction']``` ordered and labeled in this fashion.
+```['True X', 'Reco X', 'Model Prediction X', .... Y...., ..... Z .... ]``` ordered and labeled in this fashion.
 
 At this stage, the use can now make numerous comparisons between the model and the standard NOvA "Elastic Arms" algorithm!
 
@@ -206,11 +232,23 @@ Have fun!
 
 Now we want to analyze the results of the model predictions.
 
-Again, we emphasize that for this particular NOvA production, Prod5.1 for FD, we designate file "24" and file "27" for the inference data set.
+Again, we emphasize that for this particular NOvA production, Prod5.1 for FD, we designate file "27" (and file "24" depending on the case) for the evaluation of the model.
 
 
 i. `plot_cvnmap_predictions.ipynb`
 This macro will plot the pixel map with the true vertex location _and_ the model prediction. This is intended as a qualitative check.
+(you can specify a specific event if desired)
 
-ii. `fd_p5p1_nu_specrta.ipynb` This macro plots simple Enu distribution, and also broken down into interaction type.
+ii. `fd_p5p1_nu_specrta.ipynb` This macro plots simple Enu distribution, and also broken down into interaction type (probably better considered an "initial check").
 
+iii. `plot_1d_vertex_resolutions.py` script to plot (model - truth) resolutions, 
+as well as %-difference, absolute difference, and also to make the plots broken down by interaction type. Highly useful.
+
+iv. `plot_2d_vertex_resolutions.py` script to plot the 2D resolution for a selected pair of coordinates. 
+Better for qualitative interpretation.
+
+v. `plot_vertex_vs_location.py` a helpful script that plots the location of the vertex for both the Elastic Arms and Model 
+predictions. A perfect fit would place all points on the diagonal line.
+
+vi. `plot_vertex_vs_energy.py` script to plot Elastic Arms and Model Pred vertices together as a function of neutrino energy,
+also a qualitative plot.
