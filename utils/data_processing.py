@@ -1,8 +1,8 @@
 # data_processing.py
 # Useful utilities for doing the training.
 
-
-from numpy import ndarray, array
+from pandas import DataFrame, read_csv
+from numpy import ndarray, array, where
 
 # coordinate conversion functions. These are global.
 # Far Detector conversions.
@@ -69,14 +69,16 @@ def print_input_data(d_tr, d_te, d_va) -> None:
     """
     print('Final printout of shape before feeding into network......')
     print('training: (after final reshaping)')
+    print('features dtype: ', d_tr['xz'].dtype)
+    print('labels dtype: ', d_tr['vtx'].dtype)
     print("data_train['xz'].shape: ", d_tr['xz'].shape)
     print("data_train['yz'].shape: ", d_tr['yz'].shape)
     if d_va:
         print("data_val['xz'].shape: ", d_va['xz'].shape)
         print("data_val['yz'].shape: ", d_va['yz'].shape)
     print('testing:')
-    print("test_train['xz'].shape: ", d_te['xz'].shape)
     print("data_test['xz'].shape: ", d_te['xz'].shape)
+    print("data_test['yz'].shape: ", d_te['yz'].shape)
     return None
 
 
@@ -213,6 +215,29 @@ class DataCleaning:
                 ValueError(f'coordinate {self.coordinate} is not valid.')
         return self.first_hit_array
 
+    @staticmethod
+    def sort_events_with_vtxs_outside_cvnmaps(vtx_coords) -> dict:
+        """
+        Store the events (i.e. the rows) that are inside ("keep") and outside ("drop") the cvnmaps.
+        The cvnmaps are 80x100 pixel images.
+        Information is stored as a dictionary. The cuts are NOT applied.
+        User must apply this cut themselves -- to both the cvnmaps and vtx_coords (features & labels).
+        :param vtx_coords: np.array [N,3]
+        :return: dict {str, np.array} ("keep", "drop". in that order)
+        """
+        filter_xy =  ((vtx_coords[:, 0] >= 0) & (vtx_coords[:, 0] < 80)
+                    & (vtx_coords[:, 1] >= 0) & (vtx_coords[:, 1] < 80))
+        filter_z =    (vtx_coords[:, 2] >= 0) & (vtx_coords[:, 2] < 100)
+        filter_cvnmap = filter_xy & filter_z
+
+        assert vtx_coords[filter_cvnmap].shape == vtx_coords[filter_xy & filter_z].shape, "Filtering masks give different shapes..."
+
+        rows_to_keep = where(filter_cvnmap)[0]  # [0] gives the row index
+        rows_to_drop = where(~filter_cvnmap)[0]
+        print(f"Rows to keep, {len(rows_to_keep)} : {rows_to_keep}")
+        print(f"Rows to drop, {len(rows_to_drop)} : {rows_to_drop}")
+
+        return {"keep": rows_to_keep, "drop": rows_to_drop}
 
     @staticmethod
     # or select_y_centered_cvnmaps() ...?
@@ -233,3 +258,55 @@ class DataCleaning:
         events_removed = len(vtx_coords_cvnmap) - len(vtx_coords_y_centered)
         print('Events removed that are not centered in Y axis on cvnmap: ', events_removed)
         return vtx_coords_y_centered, events_removed
+
+class ModelPrediction:
+    @staticmethod
+    def load_pred_csv_file(pred_file) -> DataFrame:
+        # Load the CSV file of the model predictions.
+        csvfile = read_csv(pred_file,
+                            sep=',',
+                            dtype={'Event': int,
+                                    'True X': float,
+                                     'True Y': float,
+                                     'True Z': float,
+                                     'Reco X': float,
+                                     'Reco Y': float,
+                                     'Reco Z': float,
+                                     'Model Prediction X': float,
+                                     'Model Prediction Y': float,
+                                     'Model Prediction Z': float
+                                    },
+                              low_memory=False,
+                              index_col='Event'
+                              )
+
+        # create the dataframe from the CSV file column
+        df = csvfile[['True X', 'True Y', 'True Z',
+                      'Reco X', 'Reco Y', 'Reco Z',
+                      'Model Prediction X', 'Model Prediction Y', 'Model Prediction Z']]
+        df.columns = df.columns.str.replace('Prediction', 'Pred')
+        print(len(df), 'predictions in file')
+        print(df.head())
+        return df
+
+    @staticmethod
+    def create_abs_vtx_diff_columns(dframe, coordinate): # -> tuple[DataFrame, DataFrame]:
+        """
+        Return two dataframes: absolute vertex difference...
+        -- abs(E.A. - True) vertex
+        -- abs(Model - True) vertex.
+        :param dframe: dataframe made from teh CSV file
+        :param coordinate: x, y, or z.
+        :return: tuple(df, df)
+        """
+        print('Adding the differences (and absolute) now......')
+        coordinate = coordinate.upper()
+
+        # resolution
+        print('Creating "AbsVtxDiff.EA.{}" and "AbsVtxDiff.Model.{}" column'.format(coordinate, coordinate))
+        vtx_abs_diff_ea_temp = DataFrame(abs(dframe['True {}'.format(coordinate)] - dframe['Reco {}'.format(coordinate)]),
+                                     columns=['AbsVtxDiff.EA.{}'.format(coordinate)])
+        vtx_abs_diff_model_temp = DataFrame(abs(dframe[f'True {coordinate}'] - dframe[f'Model Pred {coordinate}']),
+                                           columns=[f'AbsVtxDiff.Model.{coordinate}'])
+
+        return vtx_abs_diff_ea_temp, vtx_abs_diff_model_temp

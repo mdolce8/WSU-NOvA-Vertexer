@@ -1,8 +1,15 @@
 # iomanager.py
 # Tools to assist reading and writing.
 
-import os
 import h5py
+import os
+import psutil
+import time
+
+# Print memory usage
+def print_memory_usage():
+    mem = psutil.virtual_memory()
+    print(f"{time.ctime()}: {mem.percent}% used, {mem.available / (1024 ** 3):.2f} GB available\n")
 
 def load_data(path_to_data, load_elasticarms = False):
     """

@@ -1,9 +1,10 @@
 # model.py
 
+import os
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Input, Dense, Conv2D, MaxPool2D, Flatten, Activation, Concatenate
+from tensorflow.keras.layers import Activation, Concatenate, Conv2D, Dense, Dropout, Flatten, Input, MaxPool2D
 from tensorflow.python.client import device_lib
 import time
 from typing import Tuple
@@ -86,13 +87,15 @@ class Config:
             MaxPool2D(pool_size=(2, 2)),
             Flatten(),
             Dense(256, activation='relu'),
+            Dropout(0.3),
             Dense(256, activation='relu'),
-            Dense(256, activation='relu')
+            Dropout(0.3),
+            Dense(256, activation='relu'),
+            Dense(256, activation='relu'),
         ])
         return m
 
     @staticmethod
-    # TODO: add an arg for final layer activation function...?
     def assemble_model_output(model_xz, model_yz) -> Model:
         input_shape = (100, 80, 1)
         input_xz = Input(shape=input_shape)
@@ -107,24 +110,35 @@ class Config:
 
         # add additional dense layers and output
         dense_layer_1 = Dense(256, activation='relu')(concatenated)
+        d1 = Dropout(0.3)(dense_layer_1)
         dense_layer_2 = Dense(256, activation='relu')(dense_layer_1)
+        d2 = Dropout(0.3)(dense_layer_2)
         dense_layer_3 = Dense(256, activation='relu')(dense_layer_2)
-        output = Dense(3, activation='relu')(dense_layer_3)
-        # TODO: this might need to be changed to "linear", if we see bad results.
+        output = Dense(3, activation='linear')(dense_layer_3)
 
         return Model(inputs=[input_xz, input_yz], outputs=output)
 
     @staticmethod
-    def compile_model(model_output):
+    def root_mean_squared_error(y_true, y_pred):
+        return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
+
+    @staticmethod
+    def compile_model(model_output, loss="logcosh", metrics=None):
         """
-        Compile the model
-        :param model_output:
+        Compile the model output.
+        :param model_output: the model you would like to compile
+        :param loss: the loss to use
+        :param metrics: the metrics to use. Default is ["mse", "mae"]
         :return: None
         """
-        # TODO: add options for changing the metrics, but leave for now.
-        model_output.compile(loss='logcosh',
+        # Logcosh calculated independently for x, y, z. Then summed
+        if metrics is None:
+            metrics = ["mse", "mae"]
+        model_output.compile(loss=loss,
                              optimizer='adam',
-                             metrics=['mse'])  # loss was 'mse' then 'mae'
+                             metrics=metrics)  # loss was 'mse' then 'mae'
+        print('Selected Loss Function: ', loss)
+        print('Selected Metrics: ', metrics)
         return None
 
 def train_model(model_output,
@@ -147,18 +161,19 @@ def train_model(model_output,
         y=data_training['vtx'],
         epochs=epochs,
         batch_size=batch_size,
-        verbose=1,
         validation_data=({'data_val_xz': data_validation['xz'], 'data_val_yz': data_validation['yz']}, data_validation['vtx']))
+
     stop = time.time()
     elapsed = (stop - start) / 60
     print(f'Time to train: {elapsed:.2f} minutes.')
     return history
 
-def evaluate_model(model_output, data_testing, evaluate_dir):
+def evaluate_model(model_output, data_testing, filtered_events, evaluate_dir):
     """
     Evaluate the model on testing data.
     :param model_output: Model (output from model)
     :param data_testing: dict (testing data, should already be divided for testing)
+    :param filtered_events: dict {"keep": array, "drop: array"} in that order
     :param evaluate_dir: str (directory to save evaluation results)
     :return: evaluation: array (single values for each metric)
     """
@@ -166,15 +181,21 @@ def evaluate_model(model_output, data_testing, evaluate_dir):
     print('Evaluation on the test set...')
     evaluation = model_output.evaluate(
         x={'data_test_xz': data_testing['xz'], 'data_test_yz': data_testing['xz']},
-        y=data_testing['vtx'],
-        verbose=1)
+        y=data_testing['vtx'])
     stop_eval = time.time()
     print('Test Set Evaluation: {}'.format(evaluation))
     print('Evaluation time: ', stop_eval - start_eval)
 
     # NOTE: evaluation only returns ONE number for each metric , and one for the loss, so just write to txt file.
+    if not os.path.exists(evaluate_dir):
+        os.makedirs(evaluate_dir)
+        print('created dir: {}'.format(evaluate_dir))
+    else:
+        print('dir already exists: {}'.format(evaluate_dir))
     with open(f'{evaluate_dir}/evaluation_results.txt', 'w') as f:
         f.write(f"Test Loss: {evaluation[0]}\n")
         f.write(f"Test MSE: {evaluation[1]}\n")
+        f.write('Passed: {}\n'.format(len(filtered_events['keep'])))
+        f.write('Dropped: {}\n'.format(len(filtered_events['drop'])))
     print('Saved evaluation to: ', evaluate_dir + '/evaluation_results.txt')
     return evaluation

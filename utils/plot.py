@@ -155,7 +155,9 @@ def plot_training_metrics(history, base_dir, output_name):
 
     # Save the plot in different formats
     for ext in ['png', 'pdf']:
-        plt.savefig(plot_dir + "." + ext)
+        filename = plot_dir + "/" + output_name + "." + ext
+        plt.savefig(filename)
+        print("Saved file: ", filename)
     return None
 
 def make_output_dir(outdir_prefix, outdir_name, filename):
