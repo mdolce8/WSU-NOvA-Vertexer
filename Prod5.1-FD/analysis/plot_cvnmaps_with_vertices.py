@@ -144,7 +144,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--pred_file_x", help="the CSV prediction file", default="", type=str)
 parser.add_argument("--pred_file_y", help="the CSV prediction file", default="", type=str)
 parser.add_argument("--pred_file_z", help="the CSV prediction file", default="", type=str)
-parser.add_argument("--verbose", help="add printouts, helpful for debugging", default=False, type=bool)
+parser.add_argument("--verbose", help="add printouts, helpful for debugging", action=argparse.BooleanOptionalAction, type=bool)
 
 args = parser.parse_args()
 args.pred_file_x = args.pred_file_x
@@ -326,12 +326,13 @@ print('type of vtx_x_pixelmap: ', type(vtx_x_pixelmap))
 print('and shape: ', vtx_x_pixelmap.shape)
 
 # print out info for single event to double check
-print('Here is an example of the conversion for a single event:')
-print('vtx_x[1] = ', vtx_x[1])
-print('vtx_x_pixelmap[1] = ', vtx_x_pixelmap[1])
-print('firstcellx after conversion: ', firstcellx[1])
-print('vtx_z[1] = ', vtx_z[1])
-print('vtx_z_pixelmap[1] = ', vtx_z_pixelmap[1])
+if args.verbose:
+    print('Here is an example of the conversion for a single event:')
+    print('vtx_x[1] = ', vtx_x[1])
+    print('vtx_x_pixelmap[1] = ', vtx_x_pixelmap[1])
+    print('firstcellx after conversion: ', firstcellx[1])
+    print('vtx_z[1] = ', vtx_z[1])
+    print('vtx_z_pixelmap[1] = ', vtx_z_pixelmap[1])
 
 
 
@@ -366,25 +367,22 @@ def plot_cvnmap_with_vertices(event_idx=1, plot_vtx=True, plot_Model_vtx=True, p
 
     if plot_vtx:
         # plot True vertex point
-        axes[0].scatter(x=vtx_x_pixelmap[event_idx], y=vtx_z_pixelmap[event_idx], c='yellow', marker='x', s=75)
-        axes[1].scatter(x=vtx_y_pixelmap[event_idx], y=vtx_z_pixelmap[event_idx], c='yellow', marker='x', s=75)
+        axes[0].scatter(x=vtx_x_pixelmap[event_idx], y=vtx_z_pixelmap[event_idx], c='magenta', marker='x', s=250)
+        axes[1].scatter(x=vtx_y_pixelmap[event_idx], y=vtx_z_pixelmap[event_idx], c='magenta', marker='x', s=250)
         true_str = 'True'
 
     if plot_Model_vtx:
         # plot Model vertex point
-        axes[0].scatter(x=vtx_model_x_pixelmap[event_idx], y=vtx_model_z_pixelmap[event_idx], c='orange', marker='x', s=75)
-        axes[1].scatter(x=vtx_model_y_pixelmap[event_idx], y=vtx_model_z_pixelmap[event_idx], c='orange', marker='x', s=75)
+        axes[0].scatter(x=vtx_model_x_pixelmap[event_idx], y=vtx_model_z_pixelmap[event_idx], c='black', marker='x', s=250)
+        axes[1].scatter(x=vtx_model_y_pixelmap[event_idx], y=vtx_model_z_pixelmap[event_idx], c='black', marker='x', s=250)
         model_str = 'Model'
 
     if plot_EA_vtx:
         # plot Reco E.A. vertex point
-        axes[0].scatter(x=vtx_EA_x_pixelmap[event_idx], y=vtx_EA_z_pixelmap[event_idx], c='green', marker='x', s=75)
-        axes[1].scatter(x=vtx_EA_y_pixelmap[event_idx], y=vtx_EA_z_pixelmap[event_idx], c='green', marker='x', s=75)
+        axes[0].scatter(x=vtx_EA_x_pixelmap[event_idx], y=vtx_EA_z_pixelmap[event_idx], c='lime', marker='x', s=250)
+        axes[1].scatter(x=vtx_EA_y_pixelmap[event_idx], y=vtx_EA_z_pixelmap[event_idx], c='lime', marker='x', s=250)
         ea_str = 'EA'
 
-    axes[0].set_title('XZ View', fontsize=25)
-    axes[1].set_title('YZ View', fontsize=25)
-    plt.suptitle("CVN pixel maps", fontsize=30)
 
     # print the vertex location -- down to two decimal places
     x_true = ('%.2f' % vtx_x[event_idx])
@@ -400,10 +398,15 @@ def plot_cvnmap_with_vertices(event_idx=1, plot_vtx=True, plot_Model_vtx=True, p
     # print('CVN Vertex Position [pixels] (x,y,z) = ({},{},{})'.format(x, y, z))
     # plt.text(-70, 50, 'CVN Vertex Position [pixels]:\n(x,y,z) = ({},{},{})\n Event: {}'.format(x, y, z, event_idx),
     #          fontsize=15)
-    plt.text(-80, 0, '{} {} {}'.format(DETECTOR_x, HORN_x, FLUX_x), fontsize=15, weight='bold')
-    plt.text(-80, 50, 'True: ({}, {}, {}) cm'.format(x_true, y_true, z_true), fontsize=15)
-    plt.text(-80, 40, 'Model: ({}, {}, {}) cm'.format(x_model, y_model, z_model ), fontsize=15)
-    plt.text(-80, 30, 'E.A.: ({}, {}, {}) cm'.format(x_ea, y_ea, z_ea), fontsize=15)
+    axes[0].set_title('XZ View', fontsize=25)
+    axes[1].set_title('YZ View', fontsize=25)
+    plt.suptitle("CVN pixel maps", fontsize=30)
+    plt.text(20, -10, 'NOvA Simulation', color='grey', fontsize=26)
+    # plt.text(-100, -10, 'NOvA Simulation', color='grey', fontsize=26)
+    plt.text(-55, 0, '{} {} {}'.format(DETECTOR_x, HORN_x, FLUX_x), fontsize=15, weight='bold')
+    plt.text(-80, 50, 'True: ({}, {}, {}) cm'.format(x_true, y_true, z_true), fontsize=12)
+    plt.text(-80, 40, 'Model: ({}, {}, {}) cm'.format(x_model, y_model, z_model ), fontsize=12)
+    plt.text(-80, 30, 'E.A.: ({}, {}, {}) cm'.format(x_ea, y_ea, z_ea), fontsize=12)
 
     axes[0].set_xlabel("Cell", fontsize=25)
     axes[0].set_ylabel("Plane", fontsize=25)
@@ -422,7 +425,7 @@ def plot_cvnmap_with_vertices(event_idx=1, plot_vtx=True, plot_Model_vtx=True, p
         plot_str += ea_str + '_'
 
     for ext in ['pdf', 'png']:
-        plt.savefig(plot_dir_local + '/cvnmaps_{}_{}_eventidx{}_{}.{}'.format(DETECTOR_x, HORN_x, event_idx, plot_str, ext))
+        plt.savefig(plot_dir_local + '/cvnmaps_{}_{}_{}_eventidx{}.{}'.format(DETECTOR_x, HORN_x, event_idx, plot_str, ext))
 
     return 'CVN map produced. Event: {}'.format(event_idx)
 
@@ -432,9 +435,9 @@ def plot_cvnmap_with_vertices(event_idx=1, plot_vtx=True, plot_Model_vtx=True, p
 
 # create some random events to plot
 from random import randint
-rndm_array = [randint(0, 10000) for i in range(3)]
+rndm_array = [randint(0, total_events) for i in range(3)]
 for random_event in rndm_array:
     plot_cvnmap_with_vertices(event_idx=random_event, plot_vtx=True, plot_Model_vtx=True, plot_EA_vtx=True)
 
-
+plot_cvnmap_with_vertices(event_idx=3076, plot_vtx=True, plot_Model_vtx=True, plot_EA_vtx=True)
 
