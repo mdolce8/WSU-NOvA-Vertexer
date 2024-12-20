@@ -2,7 +2,7 @@
 # coding: utf-8
 # # `model_predict_coordinates_xyz.py `
 
-# $PY37 model_predict_coordinates_xyz.py --model_file <model_file>
+# $PY37 model_predict_coordinates_xyz.py --model_file <model_file>  --outdir <$OUTPUT/predictions>
 
 # Output: creates a CSV file of the vertex predictions from the model h5 file via training.
 # Note: csv file also contains 'True' and 'Elastic Arms' vertex values.
@@ -17,7 +17,10 @@ import argparse
 import numpy as np
 import pandas as pd
 from tensorflow.python.keras.models import load_model
+import os
 import time
+
+import utils.model
 
 ########### begin main script ###########
 
@@ -25,11 +28,12 @@ import time
 # collect the arguments for this macro. the horn and swap options are required.
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_file", help="the model file to generate predictions", default="", type=str)
-parser.add_argument("--outdir", help="the directory to save CSV file predictions", default=".", type=str)
+parser.add_argument("--outdir", help="the directory to save CSV file predictions", default="", type=str)
 args = parser.parse_args()
 
 # convert to the useful case
 args.model_file = args.model_file
+outdir = os.getcwd() if not args.outdir else args.outdir
 
 training_filename_prefix = args.model_file.split('/')[-1].split('.')[0]  # remove the path, just get the filename.
 DETECTOR, HORN, FLUX = io.IOManager.get_det_horn_and_flux_from_string(training_filename_prefix)
@@ -42,7 +46,7 @@ print('Generating a prediction for this coordinate...')
 
 # Load the SavedModel
 print("Loading the model file to generate predictions: ", args.model_file)
-model = load_model(args.model_file)
+model = load_model(args.model_file, custom_objects={"root_mean_squared_error": utils.model.Config.root_mean_squared_error})
 print("Model loaded successfully.")
 
 # Load the designated test file. This is file 27 -- has not been pre-processed; all info is in it.
@@ -87,6 +91,29 @@ for i in [datasets['firstcellx'], datasets['firstcelly']]:
         print('event: ', event)
     event += 1
 
+vtx_coords = np.stack(
+    (
+        dp.ConvertFarDetCoords(DETECTOR, 'x').convert_fd_vtx_to_pixelmap(datasets['vtx.x'], datasets['firstcellx']),
+        dp.ConvertFarDetCoords(DETECTOR, 'y').convert_fd_vtx_to_pixelmap(datasets['vtx.y'], datasets['firstcelly']),
+        dp.ConvertFarDetCoords(DETECTOR, 'z').convert_fd_vtx_to_pixelmap(datasets['vtx.z'], datasets['firstplane']),
+    ),
+    axis=-1
+)
+print('Done converting.')
+
+print('Now remove the file index from the cvnmap...')
+assert datasets['cvnmap'].shape[0] == 1, "More than 1 file, and the events in each file are likely not the same."
+# We assume the index of 1 is the file index! With shape (1, 497067, 16000)
+# Will have to come back when we have more than one file to predict...
+datasets['cvnmap'] = datasets['cvnmap'].squeeze() # remove the 1, (i.e. file) index
+
+# dictionary of {keep; np.array, drop: array}
+keep_drop_evts = dp.DataCleaning.sort_events_with_vtxs_outside_cvnmaps(vtx_coords)
+# Now drop events that are outside the map for ALL datasets key-value pairs
+print('dropping events outside the 80x100 maps for all datasets keys')
+for key in datasets:
+    print(key)
+    datasets[key] = datasets[key][keep_drop_evts['keep']]
 
 print('========================================')
 print('-------------------')
@@ -94,12 +121,6 @@ print('cvnmap.shape: ', datasets['cvnmap'].shape)
 print('vtx_x.shape: ', datasets['vtx.x'].shape)
 print('firstcellx.shape: ', datasets['firstcellx'].shape)
 print('-------------------')
-
-print('Now remove the file index from the cvnmap...')
-assert datasets['cvnmap'].shape[0] == 1, "More than 1 file, and the events in each file are likely not the same."
-# We assume the index of 1 is the file index! With shape (1, 497067, 16000)
-# Will have to come back when we have more than one file to predict...
-datasets['cvnmap'] = datasets['cvnmap'].squeeze() # remove the file index
 
 # Print the new shape
 print("datasets['cvnmap'].shape", datasets['cvnmap'].shape)  # Should be (497067, 16000)
@@ -167,5 +188,5 @@ print('df', type(df))
 print('The first 10 rows of the CSV are:\n', df.iloc[:10,:])
 training_filename_prefix = training_filename_prefix.split('model_')[1]  # take off the 'model_' prefix
 fileName = 'model_prediction_{}.csv'.format(training_filename_prefix)
-df.to_csv(args.outdir + fileName, sep=',')
-print(f'{args.outdir}/{fileName}')
+df.to_csv(outdir + '/' + fileName, sep=',')
+print(f'Saved to: {outdir}/{fileName}')
