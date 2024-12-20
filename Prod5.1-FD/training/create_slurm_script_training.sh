@@ -21,25 +21,19 @@ HORN=$3       # FHC or RHC
 FLUX=$4       # Nonswap, Fluxswap, combined (both numu+nue)
 EPOCHS=$5     # number of epochs to train for
 
+# convert to lowercase, upper, and capitalize
+COORDINATE=${COORDINATE,,}
+DET=${DET^^}
+HORN=${HORN^}
+FLUX=${FLUX^}
+
 echo "Coordinate: ${COORDINATE}"
 echo "Detector: ${DET}"
 echo "Horn: ${HORN}"
 echo "Flux: ${FLUX}"
 echo "Epochs: ${EPOCHS}"
 
-
-# Some documentation (from latest sbatch jobs):
-# -- Fluxswap:
-# z coordinate takes: 16 tasks, 1 node, 20 GB mem-per-cpu.
-# x coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
-# y coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
-
-# -- Nonswap:
-# x coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
-# y coordinate took : 16 tasks, 1 node, 20 GB mem-per-cpu.
-# z coordinate...... ?
-
-# TODO: investigate Physics GPU more...(can it be used together with high_mem...?)
+# TODO: reorganize the trimmed h5 files to single location
 
 outputfile=training_${COORDINATE}_${DET}_${HORN}_${FLUX}_${EPOCHS}Epochs_${DATE}
 
@@ -70,16 +64,16 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 #SBATCH --output ${LOG_OUTDIR}/${outputfile}.out
 #SBATCH --error  ${LOG_OUTDIR}/${outputfile}.err
 
-#SBATCH --ntasks=16
-#SBATCH --nodes=1         # number of nodes. Adam says sbatch requires at least 2, but has never worked for me.
-#SBATCH --mem-per-cpu=20G # memory per CPU core
-#SBATCH --gres=gpu:2      # request 2 gpu # after discussion with Abdul & Mat
+### better for a single "task"
+#SBATCH --ntasks=1         # Single task
+#SBATCH --cpus-per-task=8  # Allocate 8 CPUs for better parallel processing
+#SBATCH --mem=380000M      # bc RealMemory=384896M for gpu201901              #  400G         # Set explicit total memory
+#SBATCH --gres=gpu:2       # Request 2 GPUs
 
-#SBATCH --partition=wsu_gen_phys.q  # Physics own GPU. unclear how it works with 'highmem'
-###SBATCH --partition=wsu_gen_highmem.q
+#SBATCH --nodelist=gpu201901  # compatible with TF 2.3.1
 
 ###SBATCH --mail-type ALL
-###SBATCH --mail-user michael.dolce@wichita.edu
+###SBATCH --mail-user <WSU email address>
 #======================================================================================================================================
 
 # create the apptainer
@@ -95,14 +89,20 @@ echo "INFO: appending MLVTX to PYTHONPATH"
 export PYTHONPATH="\\\$PYTHONPATH:/homes/k948d562/ml-vertexing"
 echo "PYTHONPATH is ... \\\$PYTHONPATH"
 
-echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/single-model/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
+echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
 #run python script
-/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/single-model/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
+/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
 
 EOF
+
+# After the job finishes, log resource usage
+sleep 60
+echo "Job completed. Logging resource usage:"                    >> ${LOG_OUTDIR}/${outputfile}.out
+echo "sacct -j \$SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList "    >> ${LOG_OUTDIR}/${outputfile}.out
+sacct -j \$SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList >> ${LOG_OUTDIR}/${outputfile}.out
 
 EOS
 
 echo "Created: $slurm_dir/$slurm_script "
-echo "logs will be written to: $LOG_OUTDIR"
+echo "logs will be written to: $LOG_OUTDIR/${outputfile}"
 echo "---------------------"
