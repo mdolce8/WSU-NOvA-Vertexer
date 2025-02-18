@@ -3,6 +3,7 @@
 import os
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.layers import Activation, Concatenate, Conv2D, Dense, Dropout, Flatten, Input, MaxPool2D
 from tensorflow.python.client import device_lib
@@ -141,6 +142,15 @@ class Config:
         print('Selected Metrics: ', metrics)
         return None
 
+    @staticmethod
+    def create_early_stop():
+        """
+        create an early stopping callback.
+        Use min of val_loss after 5 epochs to stop early.
+        :return: EarlyStopping
+        """
+        early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=5)
+        return early_stop
 def train_model(model_output,
                 data_training,
                 data_validation,
@@ -162,6 +172,8 @@ def train_model(model_output,
         epochs=epochs,
         batch_size=batch_size,
         validation_data=({'xz': data_validation['xz'], 'yz': data_validation['yz']}, data_validation['vtx']),
+        callbacks=Config.create_early_stop()
+    )
 
     stop = time.time()
     elapsed = (stop - start) / 60
@@ -177,13 +189,21 @@ def evaluate_model(model_output, data_testing, filtered_events, evaluate_dir):
     :param evaluate_dir: str (directory to save evaluation results)
     :return: evaluation: array (single values for each metric)
     """
-    start_eval = time.time()
+    # Training data first
+    start_eval_train = time.time()
+    print('Evaluation on the train set...')
+    evaluation_train = model_output.evaluate(
         x={'xz': data_train['xz'], 'yz': data_train['yz']},
+        y=data_train['vtx'])
+    stop_eval = time.time()
+    time_elapsed_train = stop_eval - start_eval_train
+
+    # Now test data
+    start_eval_test = time.time()
     print('Evaluation on the test set...')
-    evaluation = model_output.evaluate(
-        x={'data_test_xz': data_testing['xz'], 'data_test_yz': data_testing['xz']},
-        y=data_testing['vtx'])
+    evaluation_test = model_output.evaluate(
         x={'xz': data_test['xz'], 'yz': data_test['yz']},
+        y=data_test['vtx'])
     stop_eval = time.time()
     print('Test Set Evaluation: {}'.format(evaluation))
     print('Evaluation time: ', stop_eval - start_eval)
