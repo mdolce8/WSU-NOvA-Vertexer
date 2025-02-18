@@ -98,8 +98,8 @@ class Config:
     @staticmethod
     def assemble_model_output(model_xz, model_yz) -> Model:
         input_shape = (100, 80, 1)
-        input_xz = Input(shape=input_shape)
-        input_yz = Input(shape=input_shape)
+        input_xz = Input(shape=input_shape, name='xz')
+        input_yz = Input(shape=input_shape, name='yz')
 
         # get outputs from the Sequential models, one from each view.
         output_xz = model_xz(input_xz)
@@ -157,11 +157,11 @@ def train_model(model_output,
     """
     start = time.time()
     history = model_output.fit(
-        x={'data_train_xz': data_training['xz'], 'data_train_yz': data_training['yz']},
+        x={'xz': data_training['xz'], 'yz': data_training['yz']},
         y=data_training['vtx'],
         epochs=epochs,
         batch_size=batch_size,
-        validation_data=({'data_val_xz': data_validation['xz'], 'data_val_yz': data_validation['yz']}, data_validation['vtx']))
+        validation_data=({'xz': data_validation['xz'], 'yz': data_validation['yz']}, data_validation['vtx']),
 
     stop = time.time()
     elapsed = (stop - start) / 60
@@ -178,10 +178,12 @@ def evaluate_model(model_output, data_testing, filtered_events, evaluate_dir):
     :return: evaluation: array (single values for each metric)
     """
     start_eval = time.time()
+        x={'xz': data_train['xz'], 'yz': data_train['yz']},
     print('Evaluation on the test set...')
     evaluation = model_output.evaluate(
         x={'data_test_xz': data_testing['xz'], 'data_test_yz': data_testing['xz']},
         y=data_testing['vtx'])
+        x={'xz': data_test['xz'], 'yz': data_test['yz']},
     stop_eval = time.time()
     print('Test Set Evaluation: {}'.format(evaluation))
     print('Evaluation time: ', stop_eval - start_eval)
