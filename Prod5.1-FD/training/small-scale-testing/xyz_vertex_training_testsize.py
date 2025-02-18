@@ -210,8 +210,8 @@ save_metric_dir = f'/home/k948d562/output/metrics/small-scale-testing/{output_na
 # Evaluate the test set
 print('METRICS:')
 evaluation = utils.model.evaluate_model(model_regCNN,
+                                        data_train,
                                         data_test,
-                                        keep_drop_evts,
                                         save_metric_dir)
 print(metrics.head())
 metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(output_name), index_label='epoch')

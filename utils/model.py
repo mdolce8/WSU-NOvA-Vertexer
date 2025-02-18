@@ -180,12 +180,12 @@ def train_model(model_output,
     print(f'Time to train: {elapsed:.2f} minutes.')
     return history
 
-def evaluate_model(model_output, data_testing, filtered_events, evaluate_dir):
+def evaluate_model(model_output, data_train, data_test, evaluate_dir):
     """
-    Evaluate the model on testing data.
+    Evaluate the average loss on the model on the train AND testing data.
     :param model_output: Model (output from model)
-    :param data_testing: dict (testing data, should already be divided for testing)
-    :param filtered_events: dict {"keep": array, "drop: array"} in that order
+    :param data_train: dict (training data, should already be divided for training)
+    :param data_test: dict (test data, should already be divided for testing)
     :param evaluate_dir: str (directory to save evaluation results)
     :return: evaluation: array (single values for each metric)
     """
@@ -205,19 +205,20 @@ def evaluate_model(model_output, data_testing, filtered_events, evaluate_dir):
         x={'xz': data_test['xz'], 'yz': data_test['yz']},
         y=data_test['vtx'])
     stop_eval = time.time()
-    print('Test Set Evaluation: {}'.format(evaluation))
-    print('Evaluation time: ', stop_eval - start_eval)
+    time_elapsed_test = stop_eval - start_eval_test
 
-    # NOTE: evaluation only returns ONE number for each metric , and one for the loss, so just write to txt file.
+    evaluation_train.append(time_elapsed_train)
+    evaluation_test.append(time_elapsed_test)
+
+    df_eval = pd.DataFrame([evaluation_train, evaluation_test], columns=['Loss', 'MSE', 'MAE', 'Eval Time'], index=['Train', 'Test'])
+
     if not os.path.exists(evaluate_dir):
         os.makedirs(evaluate_dir)
         print('created dir: {}'.format(evaluate_dir))
     else:
         print('dir already exists: {}'.format(evaluate_dir))
-    with open(f'{evaluate_dir}/evaluation_results.txt', 'w') as f:
-        f.write(f"Test Loss: {evaluation[0]}\n")
-        f.write(f"Test MSE: {evaluation[1]}\n")
-        f.write('Passed: {}\n'.format(len(filtered_events['keep'])))
-        f.write('Dropped: {}\n'.format(len(filtered_events['drop'])))
-    print('Saved evaluation to: ', evaluate_dir + '/evaluation_results.txt')
-    return evaluation
+
+    df_eval.to_csv(f'{evaluate_dir}/evaluation_results.csv', sep=',', index=True, header=True, float_format='%.3f')
+    print('Saved evaluation to: ', evaluate_dir + '/evaluation_results.csv')
+    print(df_eval.head())
+    return df_eval

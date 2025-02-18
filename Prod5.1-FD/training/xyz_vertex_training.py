@@ -172,7 +172,10 @@ save_metric_dir = '/home/k948d562/output/metrics/'
 
 # Evaluate the test set
 print('METRICS:')
-evaluation = utils.model.evaluate_model(model_regCNN, data_test, save_metric_dir)
+evaluation = utils.model.evaluate_model(model_regCNN,
+                                        data_train,
+                                        data_test,
+                                        save_metric_dir)
 print(metrics.head())
 metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(output_name), index_label='epoch')
 print('Saved metrics to: ', save_metric_dir + '/metrics_{}.csv'.format(output_name))
