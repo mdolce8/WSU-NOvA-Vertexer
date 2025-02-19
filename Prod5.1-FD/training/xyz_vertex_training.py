@@ -150,13 +150,13 @@ history = utils.model.train_model(model_regCNN,
                                   data_train,
                                   data_val,
                                   args.epochs,
-                                  64)
+                                  128)
 
 # save the history to a pandas dataframe, will append the evaluate() output to this dataframe
 metrics = pd.DataFrame(history.history)
 
 # the default output name
-output_name = '_{}epochs_{}_{}_{}_{}_XYZ'.format(args.epochs, det, horn, flux, date.today())
+output_name = '{}epochs_{}_{}_{}_{}_XYZ'.format(args.epochs, det, horn, flux, date.today())
 
 # save the model
 save_model_dir = '/home/k948d562/output/trained-models/'
