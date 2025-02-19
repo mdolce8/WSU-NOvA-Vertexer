@@ -39,8 +39,8 @@ print('data_train_path: ', train_path)
 datasets, total_events, total_files = io.load_data(train_path, False)
 
 print('========================================')
-# convert the lists to numpy arrays
-datasets = dp.convert_lists_to_nparray(datasets)
+# Convert all lists in datasets to NumPy arrays with dtype=object (while keeping the arrays within from each file arrays)
+datasets = {key: np.array(value, dtype=object) for key, value in datasets.items()}
 print('to access FILE, index in array is: (cvnmap.shape[0] = ', datasets['cvnmap'].shape[0], 'files.)')  # first dimension is the file
 
 # trust that they are all numpy.arrays AND have the right shape
