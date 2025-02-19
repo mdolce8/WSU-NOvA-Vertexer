@@ -1,6 +1,9 @@
 # model.py
 
+import numpy as np
 import os
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
@@ -151,6 +154,43 @@ class Config:
         """
         early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=5)
         return early_stop
+
+    @staticmethod
+    def transform_data(data_train, data_val, data_test):
+        """
+        Properly normalize the data. Transform using the fit from BOTH views of data_train together.
+        Transform data_test & data_val ONLY, to prevent data leakage.
+        NOTE: this compresses the H x W indices, but then returns them back after.
+        We do NOT transform the labels, 'vtx', features only of course.
+        :param data_train: dict
+        :param data_val: dict
+        :param data_test: dict
+        :return:
+        """
+        scaler = MinMaxScaler()
+        # Fit on combined training data from both views.
+        # MinMaxScaler() only works on 2D arrays, not 3D, so compress the (h x w)
+        scaler.fit(np.vstack([
+            data_train['xz'].reshape(data_train['xz'].shape[0], -1),
+            data_train['yz'].reshape(data_train['yz'].shape[0], -1)
+        ]))
+        def transform_single_dataset(data, mm_scaler):
+            """
+            This function flattens each data view (xz, yz), applies the scaler,
+            and reshapes the data back to its original shape (N, H, W).
+            Operate in place -- overwrites.
+            """
+            for k in data:
+                if k != 'vtx':
+                    data[k] = mm_scaler.transform(data[k].reshape(data[k].shape[0], -1)).reshape(data[k].shape)
+            return data
+
+        # Apply transformation to each dataset, but not on 'vtx'
+        data_train = transform_single_dataset(data_train, scaler)
+        data_val = transform_single_dataset(data_val, scaler)
+        data_test = transform_single_dataset(data_test, scaler)
+        return scaler, data_train, data_val, data_test
+
 def train_model(model_output,
                 data_training,
                 data_validation,

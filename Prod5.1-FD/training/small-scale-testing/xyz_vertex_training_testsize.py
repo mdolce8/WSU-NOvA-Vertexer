@@ -152,24 +152,20 @@ cvnmap_xz = cvnmap_xz[keep_drop_evts['keep']]
 cvnmap_yz = cvnmap_yz[keep_drop_evts['keep']]
 assert cvnmap_xz.shape[0] == cvnmap_yz.shape[0] == vtx_coords.shape[0]
 
-# reduce the memory size. Two decimal places is sufficient.
+# reduce the memory size for features & labels. Four decimal places is sufficient.
 vtx_coords = vtx_coords.astype(np.float16)
+cvnmap_xz = cvnmap_xz.astype(np.float16)
+cvnmap_yz = cvnmap_yz.astype(np.float16)
 
 
 # #### Prepare the Training & Test Sets
 # split the data into training (+ val) and testing sets
-# XZ view and YZ view. Train on both views; predict all 3 coordinates.
+# Creates dictionaries for:
 # Train -- for fit(). Val -- for fit(). Test -- for evaluate()
 data_train, data_val, data_test = utils.model.Config.create_test_train_val_datasets(cvnmap_xz, cvnmap_yz, vtx_coords)
 
-# TODO: another thing to try....normalize the cvnmaps
-# cvnmap_train_xz = cvnmap_train_xz / 255.0
-# cvnmap_test_xz = cvnmap_test_xz / 255.0
-
 print('========================================')
 utils.model.Hardware.check_gpu_status()
-print('========================================')
-dp.print_input_data(data_train, data_test, data_val)
 print('========================================')
 
 # ### MultiView Fully Connected Layer Regression CNN Model
@@ -185,6 +181,13 @@ model_regCNN = utils.model.Config.assemble_model_output(model_xz, model_yz)
 utils.model.Config.compile_model(model_regCNN)
 # print a summary of the model
 print(model_regCNN.summary())
+
+# normalize w MinMaxScaler -- don't fit() the val,test data.
+data_train, data_val, data_test = utils.model.Config.transform_data(data_train,
+                                                                    data_val,
+                                                                    data_test)
+
+dp.print_input_data(data_train, data_test, data_val)
 
 history = utils.model.train_model(model_regCNN,
                                   data_train,

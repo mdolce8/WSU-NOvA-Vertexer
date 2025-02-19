@@ -117,9 +117,10 @@ print('After, vtx_x_pixelmap: ', vtx_x_pixelmap.shape)
 vtx_coords = np.stack((vtx_x_pixelmap, vtx_y_pixelmap, vtx_z_pixelmap), axis=-1)
 print('vtx_coords: ', vtx_coords.shape)
 
-# Remove the events with un-centered Y pixelmaps
-# TODO: want to return to this. But just want to make sure all is working properly.
-# vtx_coords, events_removed_y_cvnmap = dp.DataCleaning.remove_uncentered_y_cvnmaps(vtx_coords)
+vtx_coords = vtx_coords.astype(np.float16)
+cvnmap_xz = cvnmap_xz.astype(np.float16)
+cvnmap_yz = cvnmap_yz.astype(np.float16)
+
 
 # #### Prepare the Training & Test Sets
 # split the data into training (+ val) and testing sets
@@ -131,8 +132,6 @@ data_train, data_val, data_test = utils.model.Config.create_test_train_val_datas
 
 print('========================================')
 utils.model.Hardware.check_gpu_status()
-print('========================================')
-dp.print_input_data(data_train, data_test, data_val)
 print('========================================')
 
 # ### MultiView Fully Connected Layer Regression CNN Model
@@ -149,7 +148,13 @@ utils.model.Config.compile_model(model_regCNN)
 # print a summary of the model
 print(model_regCNN.summary())
 
-# xyz-coordinate system.
+scaler, data_train, data_val, data_test = utils.model.Config.transform_data(data_train,
+                                                                            data_val,
+                                                                            data_test)
+
+dp.print_input_data(data_train, data_test, data_val)
+
+# fit() the model.
 history = utils.model.train_model(model_regCNN,
                                   data_train,
                                   data_val,
