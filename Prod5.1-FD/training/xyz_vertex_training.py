@@ -17,6 +17,7 @@ from datetime import date
 import numpy as np
 import os
 import pandas as pd
+import pickle
 from tensorflow.keras.optimizers import Adam  # optimizer
 from sklearn.metrics import mean_squared_error, mean_absolute_error, explained_variance_score, r2_score
 import time
@@ -164,7 +165,11 @@ model_regCNN.save(save_model_dir + 'model_{}.h5'.format(output_name))
 print('saved model to: ', save_model_dir + 'model_{}.h5'.format(output_name))
 # Items in the model file: <KeysViewHDF5 ['model_weights', 'optimizer_weights']>
 
-save_metric_dir = '/home/k948d562/output/metrics/'
+# save the MinMaxScaler()
+with open(f"{save_model_dir}/scaler_{output_name}.pkl", "wb") as f:
+    pickle.dump(scaler, f)
+
+save_metric_dir = f'/home/k948d562/output/metrics/{output_name}'
 
 # Evaluate the test set
 print('METRICS:')
