@@ -63,59 +63,53 @@ for i in [datasets['firstcellx'], datasets['firstcelly']]:
 
 print('========================================')
 print('Converting the vertex coordinates into pixelmap coordinates for the network...')
-# Create the vertex info in pixel map coordinates:
-# convert the vertex location (detector coordinates) to pixel map coordinates
-vtx_x_pixelmap = dp.ConvertFarDetCoords(det, 'x').convert_fd_vtx_to_pixelmap(datasets['vtx.x'], datasets['firstcellx'])
-vtx_y_pixelmap = dp.ConvertFarDetCoords(det, 'y').convert_fd_vtx_to_pixelmap(datasets['vtx.y'], datasets['firstcelly'])
-vtx_z_pixelmap = dp.ConvertFarDetCoords(det, 'z').convert_fd_vtx_to_pixelmap(datasets['vtx.z'], datasets['firstplane'])
+datasets['firstcellx'] = dp.ConvertFarDetCoords(det, 'x').convert_fd_vtx_to_pixelmap(datasets['vtx.x'], datasets['firstcellx'])
+datasets['firstcelly'] = dp.ConvertFarDetCoords(det, 'y').convert_fd_vtx_to_pixelmap(datasets['vtx.y'], datasets['firstcelly'])
+datasets['firstplane'] = dp.ConvertFarDetCoords(det, 'z').convert_fd_vtx_to_pixelmap(datasets['vtx.z'], datasets['firstplane'])
+# operate in place, and change key name to 'vtx_i_pixelmap'
+datasets['vtx_x_pixelmap'] = datasets.pop('firstcellx')
+datasets['vtx_y_pixelmap'] = datasets.pop('firstcelly')
+datasets['vtx_z_pixelmap'] = datasets.pop('firstplane')
+
+# concatenate/flatten each vertex array
+print("Reshape datasets['vtx_x_pixelmap'], datasets['vtx_y_pixelmap'], datasets['vtx_z_pixelmap'] to be of just the events...")
+print("Before, datasets['vtx_x_pixelmap']: ", datasets['vtx_x_pixelmap'].shape)
+datasets['vtx_x_pixelmap'] = np.concatenate(datasets['vtx_x_pixelmap'], axis=0)
+datasets['vtx_y_pixelmap'] = np.concatenate(datasets['vtx_y_pixelmap'], axis=0)
+datasets['vtx_z_pixelmap'] = np.concatenate(datasets['vtx_z_pixelmap'], axis=0)
+print("After, datasets['vtx_x_pixelmap']: ", datasets['vtx_x_pixelmap'].shape)
+
+# combine for Nx3 array: [X, Y, Z]
+vtx_coords = np.stack((datasets['vtx_x_pixelmap'], datasets['vtx_y_pixelmap'], datasets['vtx_z_pixelmap']), axis=-1)
 print('Done converting.')
 
-print('========================================')
-# Print out useful info about the shapes of the arrays
-print('========================================')
-print('Useful info about the shapes of the arrays:')
-print('-------------------')
-# we set file_idx manually
-print('cvnmap.shape: ', datasets['cvnmap'].shape)
-print('vtx_x.shape: ', datasets['vtx.x'].shape)
-print('vtx_x_pixelmap.shape: ', vtx_x_pixelmap.shape)
-print('firstcellx.shape: ', datasets['firstcellx'].shape)
-print('-------------------')
 
 print('========================================')
 print('Remove the file index, and reshape the pixels into 2 (100,80) views: XZ and YZ.....')
 # this array should be something like: [fileIdx](events_in_file, 16000)
 # reshape the pixels into 2 (100,80) views: XZ and YZ.
 # NOTE: this works regardless how many events are in each file...
-cmap = np.concatenate([entry.reshape(-1, 16000) for entry in datasets['cvnmap']], axis=0)  # remove the file index (8,)
-cmap = cmap.reshape(total_events, 100, 80, 2)  # divide into the pixels into the map
-cmap = cmap.reshape(cmap.shape[0], cmap.shape[1], cmap.shape[2], cmap.shape[3], 1) # add the color channel
-cmap = cmap.astype(np.float16)
-cvnmap_xz = cmap[:, :, :, 0].reshape(cmap.shape[0], 100, 80, 1)  # Extract the XZ view and reshape
-cvnmap_yz = cmap[:, :, :, 1].reshape(cmap.shape[0], 100, 80, 1)  # Extract the YZ view and reshape
-# NOTE: another thing to try....normalize the cvnmaps
-# print('cmap dtype: ', cmap.dtype)
-# print('cvnmap_xz dtype: ', cvnmap_xz.dtype)
-# print('cvnmap_yz dtype: ', cvnmap_yz.dtype)
-# cvnmap_xz /= 255.0
-# cvnmap_yz /= 255.0
-print(cmap.shape)
+datasets['cvnmap'] = np.concatenate([entry.reshape(-1, 16000) for entry in datasets['cvnmap']], axis=0)  # remove the file index (8,)
+datasets['cvnmap'] = datasets['cvnmap'].reshape(total_events, 100, 80, 2)  # divide into the pixels into the map
+datasets['cvnmap'] = datasets['cvnmap'].reshape(datasets['cvnmap'].shape[0], datasets['cvnmap'].shape[1], datasets['cvnmap'].shape[2], datasets['cvnmap'].shape[3], 1) # add the color channel
+datasets['cvnmap'] = datasets['cvnmap'].astype(np.float16)
+# these are views (without copies) to save memory
+cvnmap_xz = datasets['cvnmap'][:, :, :, 0].reshape(datasets['cvnmap'].shape[0], 100, 80, 1)  # Extract the XZ view and reshape
+cvnmap_yz = datasets['cvnmap'][:, :, :, 1].reshape(datasets['cvnmap'].shape[0], 100, 80, 1)  # Extract the YZ view and reshape
+
+print(datasets['cvnmap'].shape)
 print('XZ: ', cvnmap_xz.shape)
 print('YZ: ', cvnmap_yz.shape)
-
-
 print('========================================')
-# must re-shape the vtx_x_pixelmap array to match the cvnmap_resh_xz array
-# I.e. --> remove the first dimension [0], the file.
-print('Reshape vtx_x_pixelmap, vtx_y_pixelmap, vtx_z_pixelmap to be of just the events...')
-print('Before, vtx_x_pixelmap: ', vtx_x_pixelmap.shape)
-vtx_x_pixelmap = np.concatenate(vtx_x_pixelmap, axis=0)
-vtx_y_pixelmap = np.concatenate(vtx_y_pixelmap, axis=0)
-vtx_z_pixelmap = np.concatenate(vtx_z_pixelmap, axis=0)
-print('After, vtx_x_pixelmap: ', vtx_x_pixelmap.shape)
 
-vtx_coords = np.stack((vtx_x_pixelmap, vtx_y_pixelmap, vtx_z_pixelmap), axis=-1)
-print('vtx_coords: ', vtx_coords.shape)
+# Drop the events that are outside the cvnmap!
+# Apply to both features & labels.
+# dictionary of {keep; np.array, drop: array}
+keep_drop_evts = dp.DataCleaning.sort_events_with_vtxs_outside_cvnmaps(vtx_coords)
+vtx_coords = vtx_coords[keep_drop_evts['keep']]
+cvnmap_xz = cvnmap_xz[keep_drop_evts['keep']]
+cvnmap_yz = cvnmap_yz[keep_drop_evts['keep']]
+assert cvnmap_xz.shape[0] == cvnmap_yz.shape[0] == vtx_coords.shape[0]
 
 vtx_coords = vtx_coords.astype(np.float16)
 cvnmap_xz = cvnmap_xz.astype(np.float16)
@@ -123,8 +117,6 @@ cvnmap_yz = cvnmap_yz.astype(np.float16)
 
 
 # #### Prepare the Training & Test Sets
-# split the data into training (+ val) and testing sets
-
 # XZ view and YZ view. Train on both views; predict all 3 coordinates.
 # Train -- for fit(). Val -- for fit(). Test -- for evaluate()
 data_train, data_val, data_test = utils.model.Config.create_test_train_val_datasets(cvnmap_xz, cvnmap_yz, vtx_coords)
@@ -136,16 +128,15 @@ print('========================================')
 
 # ### MultiView Fully Connected Layer Regression CNN Model
 
-print('using only XZ model for `x`, `y`, and `z` coordinates......')
+print('using XZ and YZ views to learn `x`, `y`, and `z` coordinates......')
 # define separate models for each view
 model_xz = utils.model.Config.create_conv2d_branch_model_single_view()
 model_yz = utils.model.Config.create_conv2d_branch_model_single_view()
 
-# create final model, join the XZ and YZ, add dense layers, and concat to 3.
+# create final model, join the XZ and YZ, add dense layers, and condense to 3.
 model_regCNN = utils.model.Config.assemble_model_output(model_xz, model_yz)
 
 utils.model.Config.compile_model(model_regCNN)
-# print a summary of the model
 print(model_regCNN.summary())
 
 scaler, data_train, data_val, data_test = utils.model.Config.transform_data(data_train,
