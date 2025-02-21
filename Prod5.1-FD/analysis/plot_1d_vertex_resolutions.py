@@ -76,20 +76,12 @@ df = pd.concat([df, vtx_abs_diff_ea_temp, vtx_abs_diff_model_temp, df_mode], axi
 print("Creating 'df_modes'...........")
 df_modes = list()
 for i in range(len(int_modes)):
-    print('Int Type, Code: ', utils.plot.ModeType.name(i), ' ', int_modes[i])
     df_modes.append(df[df['Mode'] == i])
 # assert are no kUnknownMode events...
 assert (len(df[df['Mode'] == -1]) == 0)  # 'there are Unknown events. Stopping'
 
 ###################
 # TODO: not essential, but in case we want to make distributions from each neutrino flavor
-# and could make a list of dfs... need to extract the PDG too...
-# make two new dataframes: one Nonswap, one Fluxswap.
-# df_nonswap = df[df['PDG'] == 14]
-# df_fluxswap = df[df['PDG'] == 12]
-# print('Nonswap entries: ', len(df_nonswap))
-# print('Fluxswap entries: ', len(df_fluxswap))
-####################
 
 # output directory
 print('Output Directory: ', args.outdir)
@@ -151,6 +143,7 @@ for ext in ['pdf', 'png']:
     fig_res_int_EA.savefig(
         OUTDIR + '/plot_{}_allmodes_Resolution_{}_ElasticArms.'.format(
             str_det_horn, C) + ext, dpi=300)
+plt.close(fig_res_int_EA)
 
 # Model Prediction, ONLY
 # plot the resolution of the vertex for each interaction type on single plot.
@@ -178,6 +171,7 @@ for ext in ['pdf', 'png']:
     fig_res_int_Model.savefig(
         OUTDIR + '/plot_{}_allmodes_Resolution_{}_ModelPred.'.format(
             str_det_horn, C) + ext, dpi=300)
+plt.close(fig_res_int_Model)
 # ------------- All interactions separate model end -------------
 
 # ------------ Individual interactions Overlaid, Model + E.A., [Abs, Res, RelRes]  -------------
@@ -209,6 +203,7 @@ plt.subplots_adjust(bottom=0.15, left=0.15)
 for ext in ['pdf', 'png']:
     fig_resolution.savefig(OUTDIR + '/plot_{}_allmodes_{}_AbsResolution.'.
                            format(str_det_horn, C) + ext, dpi=300)
+plt.close(fig_resolution)
 
 # Resolution
 # plot the (reco - true) vertex difference for both: Elastic Arms and Model Prediction
@@ -243,6 +238,7 @@ for ext in ['pdf', 'png']:
     fig_resolution.savefig(
         OUTDIR + '/plot_{}_allmodes_{}_Resolution.'.format(str_det_horn, C) + ext,
         dpi=300)
+plt.close(fig_resolution)
 
 # Relative Resolution
 # plot the (reco - true)/true vertex difference for both:
@@ -266,7 +262,7 @@ plt.ylabel('Events')
 plt.text(0.05, hist_EA_all_relres.max() * 0.7, '{} {}\nAll Interactions\n {} coordinate'.format(DET, HORN, C),
          fontsize=8)
 plt.text(0.05,hist_EA_all_relres.max() * 0.5,
-         f'Mean E.A.: {mean_float_EA_all_relres:.3f} cm\nMean Model: {mean_float_Model_all_relres:.3f} cm',
+         f'Mean E.A.: {mean_float_EA_all_relres:.2f} cm\nMean Model: {mean_float_Model_all_relres:.2f} cm',
          fontsize=8)
 plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
 plt.legend(loc='upper right')
@@ -276,6 +272,7 @@ for ext in ['pdf', 'png']:
     fig_resolution.savefig(
         OUTDIR + '/plot_{}_allmodes_{}_RelResolution.'.format(
             str_det_horn, C) + ext, dpi=300)
+plt.close(fig_resolution)
 # ------------ Individual interactions Overlaid, Model + E.A., [Abs, Res, RelRes]  -------------
 
 
@@ -316,7 +313,7 @@ for i in range(0, len(int_modes)):
     for ext in ['pdf', 'png']:
         fig_resolution_int.savefig(OUTDIR + '/plot_{}_{}_AbsResolution_{}.'.
                                    format(str_det_horn, C, utils.plot.ModeType.name(i)) + ext, dpi=300)
-
+    plt.close(fig_resolution_int)
 
 # FOR EACH INTERACTION TYPE
 # plot the (reco - true) resolution of the vertex
@@ -360,7 +357,7 @@ for i in range(0, len(int_modes)):
         fig_res_int.savefig(OUTDIR + '/plot_{}_{}_Resolution_{}.'.format(str_det_horn,
                                                                               C,
                                                                               utils.plot.ModeType.name(i)) + ext, dpi=300)
-
+        plt.close(fig_res_int)
 
 # FOR EACH INTERACTION TYPE
 # plot the relative resolution (reco - true)/true
@@ -391,7 +388,7 @@ for i in range(0, len(int_modes)):
     plt.ylabel('Events')
     plt.title('{} Interactions'.format(utils.plot.ModeType.name(i)))
     plt.text(0.05, hist_EA.max() * 0.55, '{} {}\n{} coordinate'.format(DET, HORN, C), fontsize=8)
-    plt.text(0.05, hist_EA.max() * 0.4, 'Mean E.A.: {:.3f} cm\nMean Model: {:.3f} cm'.format(mean_EA_int_relres, mean_Model_int_relres), fontsize=8)
+    plt.text(0.05, hist_EA.max() * 0.4, 'Mean E.A.: {:.2f} cm\nMean Model: {:.2f} cm'.format(mean_EA_int_relres, mean_Model_int_relres), fontsize=8)
     plt.legend(loc='upper right')
     plt.subplots_adjust(bottom=0.15, left=0.15)
     plt.grid(color='black', linestyle='--', linewidth=0.25, axis='both')
@@ -399,3 +396,6 @@ for i in range(0, len(int_modes)):
     for ext in ['pdf', 'png']:
         fig_res_int.savefig(OUTDIR + '/plot_{}_{}_RelResolution_{}.'.
                             format(str_det_horn, C, utils.plot.ModeType.name(i)) + ext, dpi=300)
+    plt.close(fig_res_int)
+
+print('Done!')
