@@ -12,6 +12,12 @@
 DATE=$(date +%m-%d-%Y.%H.%M.%S)
 echo "current date: " $DATE
 
+# Ensure exactly 5 arguments are provided
+if [[ $# -ne 5 ]]; then
+    echo "Usage: $0 <COORDINATE> <DET> <HORN> <FLUX> <EPOCHS>"
+    echo "Example: $0 xyz FD FHC Fluxswap 100"
+    return 0
+fi
 
 COORDINATE=$1 # x, y, z, or xyz
 DET=$2        # ND or FD
@@ -65,13 +71,13 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 ### better for a single "task"
 #SBATCH --ntasks=1         # Single task
 #SBATCH --cpus-per-task=8  # Allocate 8 CPUs for better parallel processing
-#SBATCH --mem=380000M      # bc RealMemory=384896M for gpu201901
+#SBATCH --mem=384000M      # bc RealMemory=384896M for gpu201901
 #SBATCH --gres=gpu:2       # Request 2 GPUs
 
 #SBATCH --nodelist=gpu201901  # compatible with TF 2.3.1
 
 ###SBATCH --mail-type ALL
-###SBATCH --mail-user <WSU email address>
+###SBATCH --mail-user michael.dolce@wichita.edu
 #======================================================================================================================================
 
 # load modules
