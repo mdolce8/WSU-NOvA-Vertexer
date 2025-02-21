@@ -9,11 +9,15 @@
 #confusion:  from Adam Tygart...don't request multiple nodes if you can't guarantee your code can handle them.
 # -- but sbatch config fails with just 1 node.
 
-# NOTE: the x coordinate has been trained on: --ntasks=8, --mem-per-cpu=22G
-
 DATE=$(date +%m-%d-%Y.%H.%M.%S)
 echo "current date: " $DATE
 
+# Ensure exactly 5 arguments are provided
+if [[ $# -ne 5 ]]; then
+    echo "Usage: $0 <COORDINATE> <DET> <HORN> <FLUX> <EPOCHS>"
+    echo "Example: $0 xyz FD FHC Fluxswap 100"
+    return 0
+fi
 
 COORDINATE=$1 # x, y, z, or xyz
 DET=$2        # ND or FD
@@ -67,39 +71,37 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 ### better for a single "task"
 #SBATCH --ntasks=1         # Single task
 #SBATCH --cpus-per-task=8  # Allocate 8 CPUs for better parallel processing
-#SBATCH --mem=380000M      # bc RealMemory=384896M for gpu201901              #  400G         # Set explicit total memory
+#SBATCH --mem=384000M      # bc RealMemory=384896M for gpu201901
 #SBATCH --gres=gpu:2       # Request 2 GPUs
 
 #SBATCH --nodelist=gpu201901  # compatible with TF 2.3.1
 
 ###SBATCH --mail-type ALL
-###SBATCH --mail-user <WSU email address>
+###SBATCH --mail-user michael.dolce@wichita.edu
 #======================================================================================================================================
 
-# create the apptainer
-apptainer exec --nv /opt/beoshock/containers/beoshock_centos-7.9.sif /bin/bash -l <<EOF
-
 # load modules
-module load Python/3.7.4-GCCcore-8.3.0
-module load TensorFlow/2.3.1-fosscuda-2019b-Python-3.7.4
-source /home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/activate
-/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python --version
+module load Python/3.11.5-GCCcore-13.2.0
+source /homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/activate
+/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python --version
 
 echo "INFO: appending MLVTX to PYTHONPATH"
-export PYTHONPATH="\\\$PYTHONPATH:/homes/k948d562/ml-vertexing"
-echo "PYTHONPATH is ... \\\$PYTHONPATH"
+unset PYTHONPATH
+export PYTHONPATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib/python3.11/site-packages:/homes/k948d562/ml-vertexing"
+echo "PYTHONPATH is ... \$PYTHONPATH"
 
-echo "/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
+export LD_LIBRARY_PATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib:\$LD_LIBRARY_PATH"
+
+echo "/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
 #run python script
-/home/k948d562/virtual-envs/VirtualTensorFlow-Abdul/VirtualTensor/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
+/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
 
-EOF
 
 # After the job finishes, log resource usage
-sleep 60
+sleep 120
 echo "Job completed. Logging resource usage:"                    >> ${LOG_OUTDIR}/${outputfile}.out
-echo "sacct -j \$SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList "    >> ${LOG_OUTDIR}/${outputfile}.out
-sacct -j \$SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList >> ${LOG_OUTDIR}/${outputfile}.out
+echo "sacct -j \$SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList,Elapsed,State "    >> ${LOG_OUTDIR}/${outputfile}.out
+sacct -j \$SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,NodeList,Elapsed,State >> ${LOG_OUTDIR}/${outputfile}.out
 
 EOS
 

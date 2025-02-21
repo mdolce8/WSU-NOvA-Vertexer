@@ -1,8 +1,12 @@
 # model.py
 
+import numpy as np
 import os
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.layers import Activation, Concatenate, Conv2D, Dense, Dropout, Flatten, Input, MaxPool2D
 from tensorflow.python.client import device_lib
@@ -98,8 +102,8 @@ class Config:
     @staticmethod
     def assemble_model_output(model_xz, model_yz) -> Model:
         input_shape = (100, 80, 1)
-        input_xz = Input(shape=input_shape)
-        input_yz = Input(shape=input_shape)
+        input_xz = Input(shape=input_shape, name='xz')
+        input_yz = Input(shape=input_shape, name='yz')
 
         # get outputs from the Sequential models, one from each view.
         output_xz = model_xz(input_xz)
@@ -141,6 +145,52 @@ class Config:
         print('Selected Metrics: ', metrics)
         return None
 
+    @staticmethod
+    def create_early_stop():
+        """
+        create an early stopping callback.
+        Use min of val_loss after 5 epochs to stop early.
+        :return: EarlyStopping
+        """
+        early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=5)
+        return early_stop
+
+    @staticmethod
+    def transform_data(data_train, data_val, data_test):
+        """
+        Properly normalize the data. Transform using the fit from BOTH views of data_train together.
+        Transform data_test & data_val ONLY, to prevent data leakage.
+        NOTE: this compresses the H x W indices, but then returns them back after.
+        We do NOT transform the labels, 'vtx', features only of course.
+        :param data_train: dict
+        :param data_val: dict
+        :param data_test: dict
+        :return:
+        """
+        scaler = MinMaxScaler()
+        # Fit on combined training data from both views.
+        # MinMaxScaler() only works on 2D arrays, not 3D, so compress the (h x w)
+        scaler.fit(np.vstack([
+            data_train['xz'].reshape(data_train['xz'].shape[0], -1),
+            data_train['yz'].reshape(data_train['yz'].shape[0], -1)
+        ]))
+        def transform_single_dataset(data, mm_scaler):
+            """
+            This function flattens each data view (xz, yz), applies the scaler,
+            and reshapes the data back to its original shape (N, H, W).
+            Operate in place -- overwrites.
+            """
+            for k in data:
+                if k != 'vtx':
+                    data[k] = mm_scaler.transform(data[k].reshape(data[k].shape[0], -1)).reshape(data[k].shape)
+            return data
+
+        # Apply transformation to each dataset, but not on 'vtx'
+        data_train = transform_single_dataset(data_train, scaler)
+        data_val = transform_single_dataset(data_val, scaler)
+        data_test = transform_single_dataset(data_test, scaler)
+        return scaler, data_train, data_val, data_test
+
 def train_model(model_output,
                 data_training,
                 data_validation,
@@ -157,45 +207,58 @@ def train_model(model_output,
     """
     start = time.time()
     history = model_output.fit(
-        x={'data_train_xz': data_training['xz'], 'data_train_yz': data_training['yz']},
+        x={'xz': data_training['xz'], 'yz': data_training['yz']},
         y=data_training['vtx'],
         epochs=epochs,
         batch_size=batch_size,
-        validation_data=({'data_val_xz': data_validation['xz'], 'data_val_yz': data_validation['yz']}, data_validation['vtx']))
+        validation_data=({'xz': data_validation['xz'], 'yz': data_validation['yz']}, data_validation['vtx']),
+        callbacks=Config.create_early_stop()
+    )
 
     stop = time.time()
     elapsed = (stop - start) / 60
     print(f'Time to train: {elapsed:.2f} minutes.')
     return history
 
-def evaluate_model(model_output, data_testing, filtered_events, evaluate_dir):
+def evaluate_model(model_output, data_train, data_test, evaluate_dir):
     """
-    Evaluate the model on testing data.
+    Evaluate the average loss on the model on the train AND testing data.
     :param model_output: Model (output from model)
-    :param data_testing: dict (testing data, should already be divided for testing)
-    :param filtered_events: dict {"keep": array, "drop: array"} in that order
+    :param data_train: dict (training data, should already be divided for training)
+    :param data_test: dict (test data, should already be divided for testing)
     :param evaluate_dir: str (directory to save evaluation results)
     :return: evaluation: array (single values for each metric)
     """
-    start_eval = time.time()
-    print('Evaluation on the test set...')
-    evaluation = model_output.evaluate(
-        x={'data_test_xz': data_testing['xz'], 'data_test_yz': data_testing['xz']},
-        y=data_testing['vtx'])
+    # Training data first
+    start_eval_train = time.time()
+    print('Evaluation on the train set...')
+    evaluation_train = model_output.evaluate(
+        x={'xz': data_train['xz'], 'yz': data_train['yz']},
+        y=data_train['vtx'])
     stop_eval = time.time()
-    print('Test Set Evaluation: {}'.format(evaluation))
-    print('Evaluation time: ', stop_eval - start_eval)
+    time_elapsed_train = stop_eval - start_eval_train
 
-    # NOTE: evaluation only returns ONE number for each metric , and one for the loss, so just write to txt file.
+    # Now test data
+    start_eval_test = time.time()
+    print('Evaluation on the test set...')
+    evaluation_test = model_output.evaluate(
+        x={'xz': data_test['xz'], 'yz': data_test['yz']},
+        y=data_test['vtx'])
+    stop_eval = time.time()
+    time_elapsed_test = stop_eval - start_eval_test
+
+    evaluation_train.append(time_elapsed_train)
+    evaluation_test.append(time_elapsed_test)
+
+    df_eval = pd.DataFrame([evaluation_train, evaluation_test], columns=['Loss', 'MSE', 'MAE', 'Eval Time'], index=['Train', 'Test'])
+
     if not os.path.exists(evaluate_dir):
         os.makedirs(evaluate_dir)
         print('created dir: {}'.format(evaluate_dir))
     else:
         print('dir already exists: {}'.format(evaluate_dir))
-    with open(f'{evaluate_dir}/evaluation_results.txt', 'w') as f:
-        f.write(f"Test Loss: {evaluation[0]}\n")
-        f.write(f"Test MSE: {evaluation[1]}\n")
-        f.write('Passed: {}\n'.format(len(filtered_events['keep'])))
-        f.write('Dropped: {}\n'.format(len(filtered_events['drop'])))
-    print('Saved evaluation to: ', evaluate_dir + '/evaluation_results.txt')
-    return evaluation
+
+    df_eval.to_csv(f'{evaluate_dir}/evaluation_results.csv', sep=',', index=True, header=True, float_format='%.3f')
+    print('Saved evaluation to: ', evaluate_dir + '/evaluation_results.csv')
+    print(df_eval.head())
+    return df_eval

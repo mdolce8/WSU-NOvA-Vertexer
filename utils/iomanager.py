@@ -80,10 +80,8 @@ class IOManager:
         det, horn, flux = '', '', ''
         print("Determining the 'det', 'horn', 'flux' with string........:", nova_string)
         if 'FD' in nova_string:
-            print('I found `FD`.')
             det = 'FD'
         elif 'ND' in nova_string:
-            print('I found `ND`.')
             det = 'ND'
         else:
             print('ERROR. I did not find a detector exiting......')
@@ -93,27 +91,23 @@ class IOManager:
         # Get horn...
         print('Determining the horn...')
         if 'FHC' in nova_string:
-            print('I found `FHC`.')
             horn = 'FHC'
         elif 'RHC' in nova_string:
-            print('I found `RHC`.')
             horn = 'RHC'
         else:
             print('ERROR. I did not find a horn, exiting......')
             exit()
-        print('horn: {}'.format(horn))
+        print('HORN: {}'.format(horn))
 
         # Get flux...
         print('Determining the flux...')
         if 'Fluxswap' in nova_string:
-            print('I found `Fluxswap`.')
             flux = 'Fluxswap'
         elif 'Nonswap' in nova_string:
-            print('I found `Nonswap`.')
             flux = 'Nonswap'
         else:
             print('ERROR. I did not find a flux, exiting......')
             exit()
-        print('flux: {}'.format(flux))
+        print('FLUX: {}'.format(flux))
 
         return det, horn, flux

@@ -48,16 +48,6 @@ def convert_nd_vtx_y_to_pixelmap(vtx_y_array, firstcelly_array):
 def convert_nd_vtx_z_to_pixelmap(vtx_z_array, firstplane_array):
     return vtx_z_array / 6.61 - firstplane_array
 
-def convert_lists_to_nparray(dsets) -> dict:
-    """
-    Convert the lists in dsets to numpy arrays
-    :param dsets:
-    :return:
-    """
-    print("Converting to lists in 'datasets' to numpy array...")
-    dsets = {key: array(dsets[key]) for key in dsets}
-    return dsets
-
 
 def print_input_data(d_tr, d_te, d_va) -> None:
     """
@@ -101,13 +91,13 @@ class ConvertFarDetCoords:
 
     def convert_pixelmap_to_fd_vtx(self, pixelmap_array, first_hit_array):
         if self.coordinate in self.c_map_to_vtx.keys():
-            return self.c_map_to_vtx[self.coordinate](pixelmap_array, first_hit_array)
+            return array(self.c_map_to_vtx[self.coordinate](pixelmap_array, first_hit_array))
         else:
             raise ValueError(f'Coordinate {self.coordinate} is not valid.')
 
     def convert_fd_vtx_to_pixelmap(self, vtx_array, first_hit_array):
         if self.coordinate in self.c_map_to_pixelmap.keys():
-            return self.c_map_to_pixelmap[self.coordinate](vtx_array, first_hit_array)
+            return array(self.c_map_to_pixelmap[self.coordinate](vtx_array, first_hit_array))
         else:
             raise ValueError(f'Coordinate {self.coordinate} is not valid.')
 
@@ -236,6 +226,7 @@ class DataCleaning:
         rows_to_drop = where(~filter_cvnmap)[0]
         print(f"Rows to keep, {len(rows_to_keep)} : {rows_to_keep}")
         print(f"Rows to drop, {len(rows_to_drop)} : {rows_to_drop}")
+        print(f"That's {len(rows_to_drop)/(len(rows_to_keep) + len(rows_to_drop))*100:.1f}% of the rows to drop.")
 
         return {"keep": rows_to_keep, "drop": rows_to_drop}
 
