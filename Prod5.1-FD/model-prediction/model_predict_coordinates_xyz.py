@@ -17,7 +17,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import pickle
-from tensorflow.python.keras.models import load_model
+from tensorflow.keras.models import load_model
 import os
 import time
 
