@@ -226,7 +226,7 @@ class DataCleaning:
         rows_to_drop = where(~filter_cvnmap)[0]
         print(f"Rows to keep, {len(rows_to_keep)} : {rows_to_keep}")
         print(f"Rows to drop, {len(rows_to_drop)} : {rows_to_drop}")
-        print(f"That's {len(rows_to_keep)/len(rows_to_keep)*100:.2f}% of the rows to keep.")
+        print(f"That's {len(rows_to_drop)/(len(rows_to_keep) + len(rows_to_drop))*100:.1f}% of the rows to drop.")
 
         return {"keep": rows_to_keep, "drop": rows_to_drop}
 
