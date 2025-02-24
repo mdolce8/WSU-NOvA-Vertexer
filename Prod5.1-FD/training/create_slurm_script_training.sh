@@ -71,13 +71,13 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 ### better for a single "task"
 #SBATCH --ntasks=1         # Single task
 #SBATCH --cpus-per-task=8  # Allocate 8 CPUs for better parallel processing
-#SBATCH --mem=384000M      # bc RealMemory=384896M for gpu201901
+#SBATCH --mem=384000M      # bc RealMemory=512GB for gpu202401
 #SBATCH --gres=gpu:2       # Request 2 GPUs
 
-#SBATCH --nodelist=gpu201901  # compatible with TF 2.3.1
+#SBATCH --nodelist=gpu202401  # compatible with TF 2.15.0
 
 ###SBATCH --mail-type ALL
-###SBATCH --mail-user michael.dolce@wichita.edu
+###SBATCH --mail-user <email-here>
 #======================================================================================================================================
 
 # load modules
