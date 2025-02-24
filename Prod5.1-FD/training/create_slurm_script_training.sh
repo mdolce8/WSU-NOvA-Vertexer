@@ -41,13 +41,13 @@ echo "Epochs: ${EPOCHS}"
 
 outputfile=training_${COORDINATE}_${DET}_${HORN}_${FLUX}_${EPOCHS}Epochs_${DATE}
 
-LOG_OUTDIR="/home/k948d562/output/logs/"
+LOG_OUTDIR="/home/${USER}/output/logs/"
 
 TRAINING_SCRIPT=${COORDINATE}_"vertex_training.py"
 
 DATA_TRAIN_PATH="/home/k948d562/output/training/${DET}-Nominal-${HORN}-${FLUX}/"
 
-slurm_dir="/home/k948d562/slurm-scripts/"
+slurm_dir="/home/${USER}/slurm-scripts/"
 slurm_script="submit_slurm_${outputfile}.sh"
 
 cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
@@ -71,14 +71,16 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 ### better for a single "task"
 #SBATCH --ntasks=1         # Single task
 #SBATCH --cpus-per-task=8  # Allocate 8 CPUs for better parallel processing
-#SBATCH --mem=384000M      # bc RealMemory=512GB for gpu202401
+#SBATCH --mem=384000M      # RealMemory=514903M for gpu202401
 #SBATCH --gres=gpu:2       # Request 2 GPUs
 
 #SBATCH --nodelist=gpu202401  # compatible with TF 2.15.0
 
 ###SBATCH --mail-type ALL
-###SBATCH --mail-user <email-here>
+###SBATCH --mail-user <wsuid-email>
 #======================================================================================================================================
+
+echo "user is: \${USER}"
 
 # load modules
 module load Python/3.11.5-GCCcore-13.2.0
@@ -87,14 +89,14 @@ source /homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/activate
 
 echo "INFO: appending MLVTX to PYTHONPATH"
 unset PYTHONPATH
-export PYTHONPATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib/python3.11/site-packages:/homes/k948d562/ml-vertexing"
+export PYTHONPATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib/python3.11/site-packages:/homes/\${USER}/ml-vertexing"
 echo "PYTHONPATH is ... \$PYTHONPATH"
 
 export LD_LIBRARY_PATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib:\$LD_LIBRARY_PATH"
 
-echo "/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
+echo "/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/\${USER}/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
 #run python script
-/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/k948d562/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
+/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/\${USER}/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
 
 
 # After the job finishes, log resource usage
