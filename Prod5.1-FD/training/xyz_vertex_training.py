@@ -160,7 +160,7 @@ metrics = pd.DataFrame(history.history)
 output_name = '{}epochs_{}_{}_{}_{}_XYZ'.format(args.epochs, det, horn, flux, date.today())
 
 # save the model
-save_model_dir = '/home/k948d562/output/trained-models/'
+save_model_dir = '/homes/m962g264/RegCNN_Unified_Outputs/model/'
 model_regCNN.save(save_model_dir + 'model_{}.h5'.format(output_name))
 print('saved model to: ', save_model_dir + 'model_{}.h5'.format(output_name))
 # Items in the model file: <KeysViewHDF5 ['model_weights', 'optimizer_weights']>
@@ -169,7 +169,7 @@ print('saved model to: ', save_model_dir + 'model_{}.h5'.format(output_name))
 with open(f"{save_model_dir}/scaler_{output_name}.pkl", "wb") as f:
     pickle.dump(scaler, f)
 
-save_metric_dir = f'/home/k948d562/output/metrics/{output_name}'
+save_metric_dir = f'/homes/m962g264/RegCNN_Unified_Outputs/metrics/{output_name}'
 
 # Evaluate the test set
 print('METRICS:')
@@ -182,6 +182,6 @@ metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(output_name), index_la
 print('Saved metrics to: ', save_metric_dir + '/metrics_{}.csv'.format(output_name))
 
 
-plot_dir = '/home/k948d562/plots/ml-vertexing-plots/training/'
+plot_dir = '/homes/m962g264/RegCNN_Unified_Outputs/plots/loss/'
 utils.plot.plot_training_metrics(history, plot_dir, 'train_metrics_' + output_name)
 print('Done.')
