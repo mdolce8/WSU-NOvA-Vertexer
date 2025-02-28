@@ -45,7 +45,7 @@ LOG_OUTDIR="/home/${USER}/output/logs/"
 
 TRAINING_SCRIPT=${COORDINATE}_"vertex_training.py"
 
-DATA_TRAIN_PATH="/home/${USER}/output/training/${DET}-Nominal-${HORN}-${FLUX}/"
+DATA_TRAIN_PATH="/home/k948d562/output/training/${DET}-Nominal-${HORN}-${FLUX}/"
 
 slurm_dir="/home/${USER}/slurm-scripts/"
 slurm_script="submit_slurm_${outputfile}.sh"
