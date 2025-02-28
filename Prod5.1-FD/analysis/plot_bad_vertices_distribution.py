@@ -14,6 +14,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import seaborn as sns
 import pandas as pd
 import h5py
 
@@ -104,14 +105,17 @@ cvnmap_yz = datasets['cvnmap'][:, :, :, 1].reshape(datasets['cvnmap'].shape[0], 
 # Apply to both features & labels.
 # dictionary of {keep; np.array, drop: array}
 keep_drop_evts = dp.DataCleaning.sort_events_with_vtxs_outside_cvnmaps(vtx_coords)
-#Making a distribution for the droped vtx 
+
+#Making a distribution for the droped vtx by extracting the dropped 
 dropped_vtx = vtx_coords[keep_drop_evts['drop']]
 
-#for keeping
-vtx_coords = vtx_coords[keep_drop_evts['keep']]
-cvnmap_xz = cvnmap_xz[keep_drop_evts['keep']]
-cvnmap_yz = cvnmap_yz[keep_drop_evts['keep']]
-assert cvnmap_xz.shape[0] == cvnmap_yz.shape[0] == vtx_coords.shape[0]
+
+#Trying to use sns.countplot, the need for the categorization
+dropped_labels = (["X"] * dropped_vtx.shape[:, 0] +
+                  ["Y"] * dropped_vtx.shape[:, 1] +
+                  ["Z"] * dropped_vtx.shape[:, 2])
+
+df_dropped = pd.DataFrame({"Coordinate": dropped_labels})
 
 print('************************************************************')
 print(len(keep_drop_evts['drop']), vtx_coords.shape)
@@ -120,46 +124,19 @@ total_events = vtx_coords.shape[0] + len(keep_drop_evts['drop'])
 drop_percent = (len(keep_drop_evts['drop'])/total_events) * 100
 drop_text = f"Dropped Events: {len(keep_drop_evts['drop'])} ({drop_percent:.2f}%)"
 
-def save_plot(fig, filename):
-    fig.savefig(os.path.join(outdir, f"{filename}.png"))
-    fig.savefig(os.path.join(outdir, f"{filename}.pdf"))
-    plt.close(fig)
 
-#Creating plots for X, Y and Z  
+#For plots
 fig, ax = plt.subplots(figsize=(10, 8))
-ax.hist(dropped_vtx[:, 0], bins=200, color='red', alpha=0.7, edgecolor='black')
-ax.set_title("X Coordinate Dropped Vtx")
-ax.set_xlabel("X - Coordinate")
+sns.countplot(data=df_dropped, x="Coordinate", palette=["blue", "green", "yellow"], ax=ax)
+ax.set_title("Events Outside The Cvnmap (80 by 100) Distribution by Coordinate")
+ax.set_xlabel("Coordinate")
 ax.set_ylabel("Events")
-ax.text(0.95, 0.95, drop_text, transform=ax.transAxes, fontsize=10,
+ax.text(0.95, 0.95, drop_text, transform=ax.transAxes, fontsize=12,
         verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5))
-save_plot(fig, "dropped_X_distribution")
 
-#Y plots
-fig, ax = plt.subplots(figsize=(10, 8))
-ax.hist(dropped_vtx[:, 1], bins=200, color='forestgreen', alpha=0.7, edgecolor='black')
-ax.set_title("Y Coordinate Dropped Vtx")
-ax.set_xlabel("Y Coordinate")
-ax.set_ylabel("Events")
-ax.text(0.95, 0.95, drop_text, transform=ax.transAxes, fontsize=10,
-        verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5))
-save_plot(fig, "dropped_Y_distribution")
 
-#Z plots
-fig, ax = plt.subplots(figsize=(10, 8))
-ax.hist(dropped_vtx[:, 2], bins=200, color='aquamarine', alpha=0.7, edgecolor='black')
-ax.set_title("Z Coordinate Dropped Vtx")
-ax.set_xlabel("Z Coordinate")
-ax.set_ylabel("Events")
-ax.text(0.95, 0.95, drop_text, transform=ax.transAxes, fontsize=10,
-        verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5))
-save_plot(fig, "dropped_Z_distribution")
-#Plots text
-#plt.figtext(0.5, -0.05, f"Dropped Events: {len(keep_drop_evts['drop'])} ({drop_percent:.2f}%)",
-#        fontsize=12, ha="center", bbox={"facecolor": "white", "alpha":0.5, "pad":5})
-
-plt.tight_layout()
-plt.savefig(os.path.join(outdir, "dropped_XYZ_distribution.png"))
-plt.savefig(os.path.join(outdir, "dropped_XYZ_distribution.pdf"))
-plt.close()
+#Saving plots
+fig.savefig(os.path.join(outdir, "Dropped_Count_plots.png"))
+fig.savefig(os.path.join(outdir, "Dropped_Count_plots.pdf"))
+plt.close(fig)
 
