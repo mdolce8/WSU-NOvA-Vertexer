@@ -80,7 +80,7 @@ cat > $slurm_dir/submit_slurm_${outputfile}.sh <<EOS
 ###SBATCH --mail-user <wsuid-email>
 #======================================================================================================================================
 
-echo "user is: \$USER"
+echo "user is: \${USER}"
 
 # load modules
 module load Python/3.11.5-GCCcore-13.2.0
