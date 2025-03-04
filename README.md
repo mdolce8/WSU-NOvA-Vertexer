@@ -31,3 +31,21 @@ This project uses:
 
 
 ---
+
+# Setup 
+
+Here are the steps to setup the virtual environment.
+
+0. log onto BeoShock
+1. `module load Python/3.11.5-GCCcore-13.2.0`
+2. `source ~/virtual-envs/py3.11-pipTF2.15.0/bin/activate`
+3. `source /path/to/your/WSU-NOvA-Vertexer/setup_env.sh`
+
+
+We use a single virtual environment currently. If you want to make your own:
+
+1. `module load Python/3.11.5-GCCcore-13.2.0`
+2. create and activate your virtual env with this version of python
+3. check your `PYTHONPATH` and `LD_LIBRARY_PATH` are pointing to your venv. If not, set by hand (keep existing LD_LIBRARY_PATH paths).
+4. `pip install poetry==1.7.0`
+5. `poetry install`
