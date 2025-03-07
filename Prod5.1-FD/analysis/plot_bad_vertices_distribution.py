@@ -37,15 +37,14 @@ print('WARNING: You are to use the full training dataset, be sure you have the c
 print('data_train_path: ', train_path)
 datasets, total_events, total_files = io.load_data(train_path, False)
 
-print('========================================')
-# convert the lists to numpy arrays
-datasets = dp.convert_lists_to_nparray(datasets)
+# Convert all lists in datasets to NumPy arrays with dtype=object (while keeping the arrays within from each file arrays)
+datasets = {key: np.array(value, dtype=object) for key, value in datasets.items()}
 print('to access FILE, index in array is: (cvnmap.shape[0] = ', datasets['cvnmap'].shape[0], 'files.)')  # first dimension is the file
 
-#trust that they are all numpy.arrays AND have the right shape
-#for key in datasets:
-#    print(key)
-#    dp.Debug(datasets[key]).printout_type()
+# trust that they are all numpy.arrays AND have the right shape
+for key in datasets:
+    print(key)
+    dp.Debug(datasets[key]).printout_type()
 
 print('========================================')
 datasets['firstcellx'] = dp.DataCleaning(datasets['firstcellx'], 'x').remove_unsigned_ints()
@@ -61,8 +60,8 @@ for i in [datasets['firstcellx'], datasets['firstcelly']]:
     event += 1
 
 #output directory
-outdir = "/homes/m962g264/wsu_Nova_Vertexer/output/XYZ_outputs/plots/"
-
+outdir = "/homes/m962g264/RegCNN_Unified_Outputs/plots/"
+os.makedirs(outdir, exist_ok=True)
 
 #Converting Detector Coordinate to PIxelmap Coordinates
 datasets['firstcellx']= dp.ConvertFarDetCoords(det, 'x').convert_fd_vtx_to_pixelmap(datasets['vtx.x'], datasets['firstcellx'])
@@ -75,7 +74,7 @@ datasets['vtx_x_pixelmap'] = datasets.pop('firstcellx')
 datasets['vtx_y_pixelmap'] = datasets.pop('firstcelly')
 datasets['vtx_z_pixelmap'] = datasets.pop('firstplane')
 
-# concatenate/flatten each vertex array
+# concatenate/flatten each vertex array                                                                                                                                                      
 print("Reshape datasets['vtx_x_pixelmap'], datasets['vtx_y_pixelmap'], datasets['vtx_z_pixelmap'] to be of just the events...")
 print("Before, datasets['vtx_x_pixelmap']: ", datasets['vtx_x_pixelmap'].shape)
 datasets['vtx_x_pixelmap'] = np.concatenate(datasets['vtx_x_pixelmap'], axis=0)
@@ -83,60 +82,71 @@ datasets['vtx_y_pixelmap'] = np.concatenate(datasets['vtx_y_pixelmap'], axis=0)
 datasets['vtx_z_pixelmap'] = np.concatenate(datasets['vtx_z_pixelmap'], axis=0)
 print("After, datasets['vtx_x_pixelmap']: ", datasets['vtx_x_pixelmap'].shape)
 
+
 # combine for Nx3 array: [X, Y, Z]
 vtx_coords = np.stack((datasets['vtx_x_pixelmap'], datasets['vtx_y_pixelmap'], datasets['vtx_z_pixelmap']), axis=-1)
 print('Done converting.')
 print('vtx_coords shape:', vtx_coords.shape)
 
+# Filter events based on cvnmaps boundaries
+filter_x = (vtx_coords[:, 0] >= 0) & (vtx_coords[:, 0] < 80)  # 0 <= x < 80
+filter_y = (vtx_coords[:, 1] >= 0) & (vtx_coords[:, 1] < 80)  # 0 <= y < 80
+filter_z = (vtx_coords[:, 2] >= 0) & (vtx_coords[:, 2] < 100)  # 0 <= z < 100
 
-# this array should be something like: [fileIdx](events_in_file, 16000)
-# reshape the pixels into 2 (100,80) views: XZ and YZ.
-# NOTE: this works regardless how many events are in each file...
-datasets['cvnmap'] = np.concatenate([entry.reshape(-1, 16000) for entry in datasets['cvnmap']], axis=0)  # remove the file index (8,)
-datasets['cvnmap'] = datasets['cvnmap'].reshape(total_events, 100, 80, 2)  # divide into the pixels into the map
-datasets['cvnmap'] = datasets['cvnmap'].reshape(datasets['cvnmap'].shape[0], datasets['cvnmap'].shape[1], datasets['cvnmap'].shape[2], datasets['cvnmap'].shape[3], 1) # add the color channel
-datasets['cvnmap'] = datasets['cvnmap'].astype(np.float16)
-# these are views (without copies) to save memory
-cvnmap_xz = datasets['cvnmap'][:, :, :, 0].reshape(datasets['cvnmap'].shape[0], 100, 80, 1)  # Extract the XZ view and reshape
-cvnmap_yz = datasets['cvnmap'][:, :, :, 1].reshape(datasets['cvnmap'].shape[0], 100, 80, 1)  # Extract the YZ view and reshape
+# Calculate the number of "Keep" and "Drop" events for each coordinate
+keep_x = np.sum(filter_x)  # Count of events where x is in range
+keep_y = np.sum(filter_y)  # Count of events where y is in range
+keep_z = np.sum(filter_z)  # Count of events where z is in range
 
+drop_x = np.sum(~filter_x)  # Count of events where x is out of range
+drop_y = np.sum(~filter_y)  # Count of events where y is out of range
+drop_z = np.sum(~filter_z)  # Count of events where z is out of range
 
-# Drop the events that are outside the cvnmap!
-# Apply to both features & labels.
-# dictionary of {keep; np.array, drop: array}
-keep_drop_evts = dp.DataCleaning.sort_events_with_vtxs_outside_cvnmaps(vtx_coords)
+# Calculate percentages of "Keep" and "Drop" events
+total_events = len(vtx_coords)
+keep_x_percent = (keep_x / total_events) * 100
+keep_y_percent = (keep_y / total_events) * 100
+keep_z_percent = (keep_z / total_events) * 100
 
-#Making a distribution for the droped vtx by extracting the dropped 
-dropped_vtx = vtx_coords[keep_drop_evts['drop']]
+drop_x_percent = (drop_x / total_events) * 100
+drop_y_percent = (drop_y / total_events) * 100
+drop_z_percent = (drop_z / total_events) * 100
 
+# Print the results
+print(f"Number of 'Keep' events for X: {keep_x} ({keep_x_percent:.2f}%)")
+print(f"Number of 'Drop' events for X: {drop_x} ({drop_x_percent:.2f}%)")
+print(f"Number of 'Keep' events for Y: {keep_y} ({keep_y_percent:.2f}%)")
+print(f"Number of 'Drop' events for Y: {drop_y} ({drop_y_percent:.2f}%)")
+print(f"Number of 'Keep' events for Z: {keep_z} ({keep_z_percent:.2f}%)")
+print(f"Number of 'Drop' events for Z: {drop_z} ({drop_z_percent:.2f}%)")
 
-#Trying to use sns.countplot, the need for the categorization
-dropped_labels = (["X"] * dropped_vtx.shape[:, 0] +
-                  ["Y"] * dropped_vtx.shape[:, 1] +
-                  ["Z"] * dropped_vtx.shape[:, 2])
-
-df_dropped = pd.DataFrame({"Coordinate": dropped_labels})
-
-print('************************************************************')
-print(len(keep_drop_evts['drop']), vtx_coords.shape)
-
-total_events = vtx_coords.shape[0] + len(keep_drop_evts['drop'])
-drop_percent = (len(keep_drop_evts['drop'])/total_events) * 100
-drop_text = f"Dropped Events: {len(keep_drop_evts['drop'])} ({drop_percent:.2f}%)"
-
-
-#For plots
-fig, ax = plt.subplots(figsize=(10, 8))
-sns.countplot(data=df_dropped, x="Coordinate", palette=["blue", "green", "yellow"], ax=ax)
-ax.set_title("Events Outside The Cvnmap (80 by 100) Distribution by Coordinate")
-ax.set_xlabel("Coordinate")
-ax.set_ylabel("Events")
-ax.text(0.95, 0.95, drop_text, transform=ax.transAxes, fontsize=12,
-        verticalalignment='top', horizontalalignment='right', bbox=dict(facecolor='white', alpha=0.5))
+# Create a DataFrame for plotting
+df = pd.DataFrame({
+    "Coordinate": ["X", "X", "Y", "Y", "Z", "Z"],
+    "Classification": ["Keep", "Drop", "Keep", "Drop", "Keep", "Drop"],
+    "Count": [keep_x, drop_x, keep_y, drop_y, keep_z, drop_z],
+    "Percentage": [keep_x_percent, drop_x_percent, keep_y_percent, drop_y_percent, keep_z_percent, drop_z_percent]
+})
 
 
-#Saving plots
-fig.savefig(os.path.join(outdir, "Dropped_Count_plots.png"))
-fig.savefig(os.path.join(outdir, "Dropped_Count_plots.pdf"))
-plt.close(fig)
+# Plot the "Keep" and "Drop" counts on the same plot
+plt.figure(figsize=(10, 6))
+ax = sns.barplot(data=df, x="Coordinate", y="Count", hue="Classification", palette=["slategray", "yellowgreen"], width=0.6)
 
+# Add percentage labels on top of the bars
+for i, (count, percent) in enumerate(zip(df["Count"], df["Percentage"])):
+    ax.text(i // 2, count + 0.1, f"{percent:.2f}%", ha="center", va="bottom", fontsize=9)
+
+plt.title("RHC Fluxswap Number of Keep and Drop Events by Coordinate")
+plt.xlabel("Coordinate")
+plt.ylabel("Count")
+plt.legend(title="Classification")
+plt.tight_layout()
+
+# Save the plot to the output directory
+output_file = os.path.join(outdir, "RHC_Fluxswap_keep_drop_counts.png")
+plt.savefig(output_file, dpi=300, bbox_inches="tight")
+print(f"Plot saved to {output_file}")
+
+# Show the plot (optional)
+plt.show()
