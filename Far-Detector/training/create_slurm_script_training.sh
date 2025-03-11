@@ -89,14 +89,14 @@ source /homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/activate
 
 echo "INFO: appending MLVTX to PYTHONPATH"
 unset PYTHONPATH
-export PYTHONPATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib/python3.11/site-packages:/homes/\${USER}/ml-vertexing"
+export PYTHONPATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib/python3.11/site-packages:/homes/\${USER}/WSU-NOvA-Vertexer"
 echo "PYTHONPATH is ... \$PYTHONPATH"
 
 export LD_LIBRARY_PATH="/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/lib:\$LD_LIBRARY_PATH"
 
-echo "/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/\${USER}/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
+echo "/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/\${USER}/WSU-NOvA-Vertexer/Far-Detector/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS"
 #run python script
-/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/\${USER}/ml-vertexing/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
+/homes/k948d562/virtual-envs/py3.11-pipTF2.15.0/bin/python /home/\${USER}/WSU-NOvA-Vertexer/Far-Detector/training/${TRAINING_SCRIPT} --data_train_path ${DATA_TRAIN_PATH} --epochs $EPOCHS
 
 
 # After the job finishes, log resource usage
