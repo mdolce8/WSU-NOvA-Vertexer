@@ -202,13 +202,13 @@ metrics = pd.DataFrame(history.history)
 output_name = 'testsize_{}epochs_{}_{}_{}_{}_XYZ'.format(args.epochs, det, horn, flux, date.today())
 
 # save the model
-save_model_dir = '/home/k948d562/output/trained-models/'
+save_model_dir = f'/home/{io.USER}/output/trained-models/'
 model_regCNN.save(save_model_dir + 'model_{}.h5'.format(output_name))
 print('saved model to: ', save_model_dir + 'model_{}.h5'.format(output_name))
 # Items in the model file: <KeysViewHDF5 ['model_weights', 'optimizer_weights']>
 
 # outdir for testsize is different.
-save_metric_dir = f'/home/k948d562/output/metrics/small-scale-testing/{output_name}'
+save_metric_dir = f'/home/{io.USER}/output/metrics/small-scale-testing/{output_name}'
 
 # Evaluate the test set
 print('METRICS:')
@@ -221,6 +221,6 @@ metrics.to_csv(save_metric_dir + '/metrics_{}.csv'.format(output_name), index_la
 print('saved metrics to: ', save_metric_dir + '/metrics_{}.csv'.format(output_name))
 # NOTE: evaluation only returns ONE number for each metric , and one for the loss, so just write to txt file.
 
-plot_dir = '/home/k948d562/plots/ml-vertexing-plots/small-scale-testing/'
+plot_dir = f'/home/{io.USER}/plots/ml-vertexing-plots/small-scale-testing/'
 utils.plot.plot_training_metrics(history, plot_dir, 'train_metrics_' + output_name)
 print('Done.')
